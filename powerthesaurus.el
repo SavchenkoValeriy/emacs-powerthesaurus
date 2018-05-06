@@ -5,9 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.1.0
-;; Package-Requires: ((dash-functional "1.2.0")
-;;                    (request "0.3.0")
-;;                    (s "1.12.0"))
+;; Package-Requires: ((dash-functional "1.2.0") (request "0.3.0") (s "1.12.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
