@@ -42,8 +42,8 @@
 If there is no selection provided, additional input will be required.
 In this case, a selected synonym will be inserted at the point."
   (interactive "r")
-  (lexical-let* ((word (powerthesaurus/get-original-word beginning end))
-                 (callback (powerthesaurus/choose-callback beginning end)))
+  (let* ((word (powerthesaurus/get-original-word beginning end))
+         (callback (powerthesaurus/choose-callback beginning end)))
     (request
      (powerthesaurus/compose-url word)
      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
