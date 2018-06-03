@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "24") (dash-functional "1.2.0") (request "0.3.0") (s "1.12.0"))
+;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -31,7 +31,6 @@
 ;;; insert selected option in the buffer (depending on the current selection).
 
 ;;; Code:
-(require 'dash-functional)
 (require 'dom)
 (require 'json)
 (require 'request)
@@ -52,11 +51,12 @@ In this case, a selected synonym will be inserted at the point."
      (powerthesaurus-compose-url word)
      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
      :success (cl-function (lambda (&key data &allow-other-keys)
-                             (funcall callback data))))))
+                             (funcall callback
+                                      (powerthesaurus-pick-synonym data)))))))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
-  (s-format "https://www.powerthesaurus.org/$0/synonyms" 'elt `(,word)))
+  (format "https://www.powerthesaurus.org/%s/synonyms" word))
 
 (defun powerthesaurus-get-original-word (beginning end)
   "Get a word to look for from the user.
@@ -73,34 +73,32 @@ Otherwise, user must provide additional information."
 
 `BEGINNING' and `END' represent provided(or not) selection."
   (if (use-region-p)
-      (-rpartial #'powerthesaurus-replace-with beginning end)
+      (lambda (x) (powerthesaurus-replace-with x beginning end))
     #'powerthesaurus-insert-word))
 
-(defun powerthesaurus-replace-with (raw-data beginning end)
+(defun powerthesaurus-replace-with (synonym beginning end)
   "Parse `RAW-DATA', pick a synonym, and replace the selected text.
 
 `BEGINNING' and `END' correspond to the selected text."
-  (let ((synonym (powerthesaurus-pick-synonym raw-data)))
-    (delete-region beginning end)
-    (insert synonym)))
+  (delete-region beginning end)
+  (insert synonym))
 
-(defun powerthesaurus-insert-word (raw-data)
+(defun powerthesaurus-insert-word (synonym)
   "Parse `RAW-DATA', pick a synonym, and insert at the point."
-  (let ((synonym (powerthesaurus-pick-synonym raw-data)))
-    (insert synonym)))
+  (insert synonym))
 
 (defun powerthesaurus-pick-synonym (raw-data)
   "Parse `RAW-DATA' from powerthesaurus and let the user to choose a word."
   (let* ((synonyms-full (powerthesaurus-parse-response raw-data))
          (synonyms (powerthesaurus-compose-choices synonyms-full)))
-    (completing-read "Choose a synonym: " synonyms nil t)))
+    (completing-read "Choose a synonym: " synonyms nil nil)))
 
 (defun powerthesaurus-compose-choices (synonyms)
   "Compose choices from the `powerthesaurus-word' list of `SYNONYMS'."
-  (mapcar (lambda (x) (powerthesaurus-word-word x)) synonyms))
+  (mapcar #'powerthesaurus-word-text synonyms))
 
 (cl-defstruct powerthesaurus-word
-  word
+  text
   rating
   )
 
@@ -114,7 +112,7 @@ Otherwise, user must provide additional information."
 
 (defun powerthesaurus-get-all-texts (nodes)
   "Get text information from all provided `NODES'."
-  (mapcar (lambda (x) (dom-text x)) nodes))
+  (mapcar #'dom-text nodes))
 
 (defun powerthesaurus-find-store-json (scripts)
   "Find and parse the store JSON out of all `SCRIPTS' nodes."
@@ -134,9 +132,9 @@ Otherwise, user must provide additional information."
 
 (defun powerthesaurus-find-good-match (matches)
   "Filter all `MATCHES' to find the one to parse synonyms from."
-  (let ((filtered (-filter (lambda (x) x) matches)))
-    (if filtered
-        (car filtered)
+  (let ((match (seq-find #'identity matches nil)))
+    (if match
+        match
       (error "Couldn't find anything"))))
 
 (defun powerthesaurus-get-json (match)
@@ -158,10 +156,10 @@ Otherwise, user must provide additional information."
 
 (defun powerthesaurus-parse-synonym (json)
   "Parse `JSON' for a single synonym and construct `powerthesaurus-word'."
-  (let* ((word (assoc-default 'term json))
+  (let* ((text (assoc-default 'term json))
          (rating (assoc-default 'rating json)))
     (make-powerthesaurus-word
-     :word word
+     :text text
      :rating rating)))
 
 (defun powerthesaurus-debug-connection ()
