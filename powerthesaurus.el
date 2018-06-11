@@ -38,13 +38,17 @@
 (require 's)
 
 ;;;###autoload
-(defun powerthesaurus-lookup-word (beginning end)
+(defun powerthesaurus-lookup-word (&optional beginning end)
   "Find the given word's synonyms at powerthesaurus.org.
 
 `BEGINNING' and `END' correspond to the selected text with a word to replace.
 If there is no selection provided, additional input will be required.
 In this case, a selected synonym will be inserted at the point."
-  (interactive "r")
+  (interactive
+   ;; it is a simple interactive function instead of interactive "r"
+   ;; because it doesn't produce an error in a buffer without a mark
+   (if (use-region-p) (list (region-beginning) (region-end))
+     (list nil nil)))
   (let* ((word (powerthesaurus-get-original-word beginning end))
          (callback (powerthesaurus-choose-callback beginning end)))
     (request
