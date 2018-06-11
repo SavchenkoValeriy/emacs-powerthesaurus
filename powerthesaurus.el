@@ -55,8 +55,11 @@ In this case, a selected synonym will be inserted at the point."
      (powerthesaurus-compose-url word)
      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
      :success (cl-function (lambda (&key data &allow-other-keys)
-                             (funcall callback
-                                      (powerthesaurus-pick-synonym data)))))))
+                             ;; in order to allow users to quit powerthesaurus
+                             ;; prompt with C-g, we need to wrap callback with this
+                             (with-local-quit
+                               (funcall callback
+                                        (powerthesaurus-pick-synonym data))))))))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
