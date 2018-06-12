@@ -12,9 +12,13 @@
 
 ## How to use
 
-There is only one interactive function available to the users: `powerthesaurus-lookup-word`. 
+**emacs-powerthesaurus** defines two interactive functions:
+* `powerthesaurus-lookup-word`
+* `powerthesaurus-lookup-word-at-point`
 
-If you have any active selection, it fetches selected text at [powerthesaurus.org](https://www.powerthesaurus.org) and gives you a list of synonyms to replace it with. Without any selection it asks you for the input first, and insert selected synonyms at point.
+If you have any active selection, `powerthesaurus-lookup-word` fetches selected text at [powerthesaurus.org](https://www.powerthesaurus.org) and gives you a list of synonyms to replace it with. Without any selection it asks you for the input first, and insert selected synonyms at point.
+
+`powerthesaurus-lookup-word-at-point` finds a word at point (according to the current mode settings), fetches it at [powerthesaurus.org](https://www.powerthesaurus.org), and also replaces it with the selected synonym.
 
 ## Demo
 
