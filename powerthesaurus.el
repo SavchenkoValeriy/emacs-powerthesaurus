@@ -38,6 +38,27 @@
 (require 's)
 
 ;;;###autoload
+(defun powerthesaurus-lookup-word-dwim ()
+  "Wrapper function for powerthesaurus-lookup-word commands.
+
+If a region is selected use powerthesaurus-lookup-word
+if a thing at point is not empty use powerthesaurus-lookup-word-at-point
+otherwise as for word using powerthesaurus-lookup-word"
+  (interactive)
+  (let (beg end bounds)
+    ;; selection is active -> look up whatever is selected
+    (if (use-region-p)
+        (progn
+          (setq beg (region-beginning))
+          (setq end (region-end))
+          (powerthesaurus-lookup-word beg end))
+      ;; point is is at a word -> look it up
+      (if (thing-at-point 'word)
+          (powerthesaurus-lookup-word-at-point (point))
+        ;; nothing appropriate nearby -> ask the user
+        (powerthesaurus-lookup-word)))))
+
+;;;###autoload
 (defun powerthesaurus-lookup-word-at-point (word-point)
   "Find word at `WORD-POINT', look it up in powerthesaurs, and replace it."
   (interactive (list (point)))

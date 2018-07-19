@@ -12,13 +12,16 @@
 
 ## How to use
 
-**emacs-powerthesaurus** defines two interactive functions:
+**emacs-powerthesaurus** defines three interactive functions:
 * `powerthesaurus-lookup-word`
 * `powerthesaurus-lookup-word-at-point`
+* `powerthesaurus-lookup-word-dwim`
 
 If you have any active selection, `powerthesaurus-lookup-word` fetches selected text at [powerthesaurus.org](https://www.powerthesaurus.org) and gives you a list of synonyms to replace it with. Without any selection it asks you for the input first, and insert selected synonyms at point.
 
 `powerthesaurus-lookup-word-at-point` finds a word at point (according to the current mode settings), fetches it at [powerthesaurus.org](https://www.powerthesaurus.org), and also replaces it with the selected synonym.
+
+`powerthesaurus-lookup-word-dwim` combines these two functions into one. It tries to infer whatever user wants to look up. If there is an active selection that will be the choice. Otherwise, it checks if there any word at point and fetches that word. And if there is nothing appropriate, it asks the user to provide a word.
 
 ## Demo
 
