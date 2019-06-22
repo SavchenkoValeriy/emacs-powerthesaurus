@@ -102,6 +102,7 @@ In this case, a selected synonym will be inserted at the point."
     (request
      (powerthesaurus-compose-url word)
      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
+     :headers '(("User-Agent" . "Chrome/74.0.3729.169"))
      :success (cl-function (lambda (&key data &allow-other-keys)
                              ;; in order to allow users to quit powerthesaurus
                              ;; prompt with C-g, we need to wrap callback with this
