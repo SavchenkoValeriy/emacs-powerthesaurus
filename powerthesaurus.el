@@ -108,7 +108,8 @@ In this case, a selected synonym will be inserted at the point."
                              ;; prompt with C-g, we need to wrap callback with this
                              (with-local-quit
                                (funcall callback
-                                        (powerthesaurus-pick-synonym data))))))))
+                                        (powerthesaurus-pick-synonym data)
+                                        word)))))))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
@@ -129,19 +130,31 @@ Otherwise, user must provide additional information."
 
 `BEGINNING' and `END' represent provided(or not) selection."
   (if (use-region-p)
-      (lambda (x) (powerthesaurus-replace-with x beginning end))
+      (lambda (new original)
+        (powerthesaurus-replace-with new beginning end original))
     #'powerthesaurus-insert-word))
 
-(defun powerthesaurus-replace-with (synonym beginning end)
+(defun powerthesaurus-replace-with (synonym beginning end original-word)
   "Parse `RAW-DATA', pick a synonym, and replace the selected text.
 
-`BEGINNING' and `END' correspond to the selected text."
+`BEGINNING' and `END' correspond to the selected text.
+`ORIGINAL-WORD' represents the original word that is being replaced."
   (delete-region beginning end)
-  (insert synonym))
+  (powerthesaurus-insert-word synonym original-word))
 
-(defun powerthesaurus-insert-word (synonym)
-  "Parse `RAW-DATA', pick a synonym, and insert at the point."
-  (insert synonym))
+(defun powerthesaurus-adjust-cases (new original)
+  "Adjust cases of the `NEW' word based on the `ORIGINAL' word.
+
+For now, it supports upcase and capitalize."
+  (cond ((s-uppercase-p original) (upcase new))
+        ((s-capitalized-p original) (capitalize new))
+        (t new)))
+
+(defun powerthesaurus-insert-word (synonym original-word)
+  "Parse `RAW-DATA', pick a synonym, and insert at the point.
+
+`ORIGINAL-WORD' represents the original word that we searched synonym for."
+  (insert (powerthesaurus-adjust-cases synonym original-word)))
 
 (defun powerthesaurus-pick-synonym (raw-data)
   "Parse `RAW-DATA' from powerthesaurus and let the user to choose a word."
