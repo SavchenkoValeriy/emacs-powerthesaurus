@@ -159,12 +159,26 @@ For now, it supports upcase and capitalize."
 (defun powerthesaurus-pick-synonym (raw-data)
   "Parse `RAW-DATA' from powerthesaurus and let the user to choose a word."
   (let* ((synonyms-full (powerthesaurus-parse-response raw-data))
-         (synonyms (powerthesaurus-compose-choices synonyms-full)))
-    (completing-read "Choose a synonym: " synonyms nil nil)))
+         (synonyms (powerthesaurus-compose-choices synonyms-full))
+         ;; this is the only way we can keep the order while using
+         ;; the default implementation of completing-read function
+         ;; see: https://emacs.stackexchange.com/a/41808/23751
+         (completion-table
+          (lambda (string pred action)
+            (if (eq action 'metadata)
+                '(metadata (display-sort-function . identity)
+                           (cycle-sort-function . identity))
+              (complete-with-action
+               action synonyms string pred))))
+         ;; ivy still will try to sort it lexicographically: deny it
+         (ivy-sort-functions-alist nil))
+    (completing-read "Choose a synonym: " completion-table nil nil)))
 
 (defun powerthesaurus-compose-choices (synonyms)
   "Compose choices from the `powerthesaurus-word' list of `SYNONYMS'."
-  (mapcar #'powerthesaurus-word-text synonyms))
+  (mapcar #'powerthesaurus-word-text
+          (sort synonyms (lambda (x y) (> (powerthesaurus-word-rating x)
+                                     (powerthesaurus-word-rating y))))))
 
 (cl-defstruct powerthesaurus-word
   text
@@ -226,7 +240,7 @@ For now, it supports upcase and capitalize."
 (defun powerthesaurus-parse-synonym (json)
   "Parse `JSON' for a single synonym and construct `powerthesaurus-word'."
   (let* ((text (assoc-default 'term json))
-         (rating (assoc-default 'rating json)))
+         (rating (string-to-number (assoc-default 'rating json))))
     (make-powerthesaurus-word
      :text text
      :rating rating)))
