@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0"))
+;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0") (jeison "1.0.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -36,6 +36,7 @@
 (require 'request)
 (require 'rx)
 (require 's)
+(require 'jeison)
 
 ;;;###autoload
 (defun powerthesaurus-lookup-word-dwim ()
@@ -176,14 +177,21 @@ For now, it supports upcase and capitalize."
 
 (defun powerthesaurus-compose-choices (synonyms)
   "Compose choices from the `powerthesaurus-word' list of `SYNONYMS'."
-  (mapcar #'powerthesaurus-word-text
-          (sort synonyms (lambda (x y) (> (powerthesaurus-word-rating x)
-                                     (powerthesaurus-word-rating y))))))
+  (mapcar (lambda (word) (oref word text))
+          (sort synonyms (lambda (x y) (> (powerthesaurus-get-rating x)
+                                     (powerthesaurus-get-rating y))))))
 
-(cl-defstruct powerthesaurus-word
-  text
-  rating
-  )
+(defun powerthesaurus-get-rating (word)
+  "Get a numeric user rating of the given `WORD'."
+  ;; TODO: get rid of it when jeison supports functional
+  ;; components of the path
+  (string-to-number (oref word rating)))
+
+(jeison-defclass powerthesaurus-word nil
+  ((text :initarg :text :type string :path term
+         :documentation "Actual text of the word from Powerthesaurus")
+   (rating :initarg :rating
+           :documentation "User rating of the word")))
 
 (defun powerthesaurus-parse-response (data)
   "Get the list of synonyms out of the raw `DATA' from request."
@@ -226,24 +234,10 @@ For now, it supports upcase and capitalize."
 
 (defun powerthesaurus-retrieve-synonyms (json)
   "Get synonyms list from a `JSON' recieved from powerthesaurus."
-  (let* ((list-json (assoc-default 'list json))
-         (pages-json (assoc-default 'pages list-json))
-         ;; use only the first page for now
-         (page-json (elt pages-json 0))
-         (terms-json (assoc-default 'terms page-json)))
-    (powerthesaurus-reduce-from-list terms-json)))
-
-(defun powerthesaurus-reduce-from-list (json)
-  "Construct words from a `JSON' list of terms."
-  (mapcar #'powerthesaurus-parse-synonym json))
-
-(defun powerthesaurus-parse-synonym (json)
-  "Parse `JSON' for a single synonym and construct `powerthesaurus-word'."
-  (let* ((text (assoc-default 'term json))
-         (rating (string-to-number (assoc-default 'rating json))))
-    (make-powerthesaurus-word
-     :text text
-     :rating rating)))
+  (jeison-read '(list-of powerthesaurus-word)
+               ;; use only the first page for now
+               ;; (0th index in the path)
+               json '(list pages 0 terms)))
 
 (defun powerthesaurus-debug-connection ()
   "Debug requests to powerthesaurus.org."
