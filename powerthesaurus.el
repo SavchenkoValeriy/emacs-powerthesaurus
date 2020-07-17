@@ -238,11 +238,10 @@ For now, it supports upcase and capitalize."
 
 (defun powerthesaurus-retrieve-synonyms (raw-data)
   "Get synonyms list from DOM."
-  (let* ((ls (dom-children
-              (nth 1 (dom-children
-                      (nth 1 (dom-by-tag raw-data 'main))))))
-         (synonyms (mapcar (lambda (x) (dom-texts (nth 1 (dom-children x))))
-                           ls))
+  (let* ((ls
+          (dom-children (nth 1 (dom-children (dom-by-tag raw-data 'main)))))
+         (synonyms
+          (mapcar (lambda (x) (dom-texts (dom-by-tag x 'a))) ls))
          (words (cl-loop for elt in synonyms and n from 0 by 1
                          collect (make-powerthesaurus-word :text elt
                                                            :rating n))))
