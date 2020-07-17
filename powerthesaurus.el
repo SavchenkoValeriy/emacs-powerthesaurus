@@ -101,16 +101,20 @@ In this case, a selected synonym will be inserted at the point."
   (let* ((word (powerthesaurus-get-original-word beginning end))
          (callback (powerthesaurus-choose-callback beginning end)))
     (request
-     (powerthesaurus-compose-url word)
-     :parser (lambda () (libxml-parse-html-region (point) (point-max)))
-     :headers '(("User-Agent" . "Chrome/74.0.3729.169"))
-     :success (cl-function (lambda (&key data &allow-other-keys)
-                             ;; in order to allow users to quit powerthesaurus
-                             ;; prompt with C-g, we need to wrap callback with this
-                             (with-local-quit
-                               (funcall callback
-                                        (powerthesaurus-pick-synonym data)
-                                        word)))))))
+      (powerthesaurus-compose-url word)
+      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
+      :headers '(("User-Agent" . "Chrome/74.0.3729.169")
+                 ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+                 ("Accept-Encoding" . "gzip, deflate, br")
+                 ("Accept-Language" . "en,en-US;q=0.5")
+                 ("Upgrade-Insecure-Requests" . "1"))
+      :success (cl-function (lambda (&key data &allow-other-keys)
+                              ;; in order to allow users to quit powerthesaurus
+                              ;; prompt with C-g, we need to wrap callback with this
+                              (with-local-quit
+                                (funcall callback
+                                         (powerthesaurus-pick-synonym data)
+                                         word)))))))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
