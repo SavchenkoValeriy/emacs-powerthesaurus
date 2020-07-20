@@ -101,16 +101,20 @@ In this case, a selected synonym will be inserted at the point."
   (let* ((word (powerthesaurus-get-original-word beginning end))
          (callback (powerthesaurus-choose-callback beginning end)))
     (request
-     (powerthesaurus-compose-url word)
-     :parser (lambda () (libxml-parse-html-region (point) (point-max)))
-     :headers '(("User-Agent" . "Chrome/74.0.3729.169"))
-     :success (cl-function (lambda (&key data &allow-other-keys)
-                             ;; in order to allow users to quit powerthesaurus
-                             ;; prompt with C-g, we need to wrap callback with this
-                             (with-local-quit
-                               (funcall callback
-                                        (powerthesaurus-pick-synonym data)
-                                        word)))))))
+      (powerthesaurus-compose-url word)
+      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
+      :headers '(("User-Agent" . "Chrome/74.0.3729.169")
+                 ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+                 ("Accept-Encoding" . "gzip, deflate, br")
+                 ("Accept-Language" . "en,en-US;q=0.5")
+                 ("Upgrade-Insecure-Requests" . "1"))
+      :success (cl-function (lambda (&key data &allow-other-keys)
+                              ;; in order to allow users to quit powerthesaurus
+                              ;; prompt with C-g, we need to wrap callback with this
+                              (with-local-quit
+                                (funcall callback
+                                         (powerthesaurus-pick-synonym data)
+                                         word)))))))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
@@ -177,9 +181,9 @@ For now, it supports upcase and capitalize."
 
 (defun powerthesaurus-compose-choices (synonyms)
   "Compose choices from the `powerthesaurus-word' list of `SYNONYMS'."
-  (mapcar (lambda (word) (oref word text))
-          (sort synonyms (lambda (x y) (> (powerthesaurus-get-rating x)
-                                     (powerthesaurus-get-rating y))))))
+  (mapcar (lambda (word) (powerthesaurus-word-text word))
+          (sort synonyms (lambda (x y) (< (powerthesaurus-word-rating x)
+                                          (powerthesaurus-word-rating y))))))
 
 (defun powerthesaurus-get-rating (word)
   "Get a numeric user rating of the given `WORD'."
@@ -188,17 +192,16 @@ For now, it supports upcase and capitalize."
   (string-to-number (oref word rating)))
 
 (jeison-defclass powerthesaurus-word nil
-  ((text :initarg :text :type string :path term
-         :documentation "Actual text of the word from Powerthesaurus")
-   (rating :initarg :rating
-           :documentation "User rating of the word")))
+                 ((text :initarg :text :type string :path term
+                        :documentation "Actual text of the word from Powerthesaurus")
+                  (rating :initarg :rating
+                          :documentation "User rating of the word")))
+
+(cl-defstruct (powerthesaurus-word) text rating)
 
 (defun powerthesaurus-parse-response (data)
   "Get the list of synonyms out of the raw `DATA' from request."
-  (let* ((script-nodes (dom-by-tag data 'script))
-         (scripts (powerthesaurus-get-all-texts script-nodes))
-         (store-json (powerthesaurus-find-store-json scripts))
-         (synonyms (powerthesaurus-retrieve-synonyms store-json)))
+  (let* ((synonyms (powerthesaurus-retrieve-synonyms data)))
     synonyms))
 
 (defun powerthesaurus-get-all-texts (nodes)
@@ -216,7 +219,8 @@ For now, it supports upcase and capitalize."
   (s-match-strings-all
    (rx bol
        (zero-or-more space)
-       "var store = "
+       ;; "var store = "
+       "window.__STATE__ = "
        (group (* (not (any ";"))))
        )
    script-text))
@@ -232,12 +236,16 @@ For now, it supports upcase and capitalize."
   "Parse `MATCH' json into an alist."
   (json-read-from-string (nth 1 (car match))))
 
-(defun powerthesaurus-retrieve-synonyms (json)
-  "Get synonyms list from a `JSON' recieved from powerthesaurus."
-  (jeison-read '(list-of powerthesaurus-word)
-               ;; use only the first page for now
-               ;; (0th index in the path)
-               json '(list pages 0 terms)))
+(defun powerthesaurus-retrieve-synonyms (raw-data)
+  "Get synonyms list from DOM."
+  (let* ((ls
+          (dom-children (nth 1 (dom-children (dom-by-tag raw-data 'main)))))
+         (synonyms
+          (mapcar (lambda (x) (dom-texts (dom-by-tag x 'a))) ls))
+         (words (cl-loop for elt in synonyms and n from 0 by 1
+                         collect (make-powerthesaurus-word :text elt
+                                                           :rating n))))
+    words))
 
 (defun powerthesaurus-debug-connection ()
   "Debug requests to powerthesaurus.org."
