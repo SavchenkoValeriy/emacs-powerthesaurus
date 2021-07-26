@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0") (jeison "1.0.0"))
+;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,11 +32,9 @@
 
 ;;; Code:
 (require 'dom)
-(require 'json)
 (require 'request)
 (require 'rx)
 (require 's)
-(require 'jeison)
 
 ;;;###autoload
 (defun powerthesaurus-lookup-word-dwim ()
@@ -64,27 +62,12 @@ otherwise as for word using powerthesaurus-lookup-word"
   "Find word at `WORD-POINT', look it up in powerthesaurs, and replace it."
   (interactive (list (point)))
   (save-mark-and-excursion
-    (unless (powerthesaurus-is-at-the-beginning-of-word word-point)
+    (unless (powerthesaurus--bow-p word-point)
       (backward-word))
     (set-mark (point))
     (forward-word)
     (activate-mark)
     (powerthesaurus-lookup-word (region-beginning) (region-end))))
-
-(defun powerthesaurus-is-at-the-beginning-of-word (word-point)
-  "Predicate to check whether `WORD-POINT' points to the beginning of the word."
-  (save-excursion
-    ;; If we are at the beginning of a word
-    ;; this will take us to the beginning of the previous word.
-    ;; Otherwise, this will take us to the beginning of the current word.
-    (backward-word)
-    ;; This will take us to the end of the previous word or to the end
-    ;; of the current word depending on whether we were at the beginning
-    ;; of a word.
-    (forward-word)
-    ;; Compare our original position with wherever we're now to
-    ;; separate those two cases
-    (< (point) word-point)))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-word (&optional beginning end)
@@ -101,20 +84,35 @@ In this case, a selected synonym will be inserted at the point."
   (let* ((word (powerthesaurus-get-original-word beginning end))
          (callback (powerthesaurus-choose-callback beginning end)))
     (request
-      (powerthesaurus-compose-url word)
-      :parser (lambda () (libxml-parse-html-region (point) (point-max)))
-      :headers '(("User-Agent" . "Chrome/74.0.3729.169")
-                 ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-                 ("Accept-Encoding" . "gzip, deflate, br")
-                 ("Accept-Language" . "en,en-US;q=0.5")
-                 ("Upgrade-Insecure-Requests" . "1"))
-      :success (cl-function (lambda (&key data &allow-other-keys)
-                              ;; in order to allow users to quit powerthesaurus
-                              ;; prompt with C-g, we need to wrap callback with this
-                              (with-local-quit
-                                (funcall callback
-                                         (powerthesaurus-pick-synonym data)
-                                         word)))))))
+     (powerthesaurus-compose-url word)
+     :parser (lambda () (libxml-parse-html-region (point) (point-max)))
+     :headers '(("User-Agent" . "Chrome/74.0.3729.169")
+                ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+                ("Accept-Encoding" . "gzip, deflate, br")
+                ("Accept-Language" . "en,en-US;q=0.5")
+                ("Upgrade-Insecure-Requests" . "1"))
+     :success (cl-function (lambda (&key data &allow-other-keys)
+                             ;; in order to allow users to quit powerthesaurus
+                             ;; prompt with C-g, we need to wrap callback with this
+                             (with-local-quit
+                               (funcall callback
+                                        (powerthesaurus-pick-synonym data)
+                                        word)))))))
+
+(defun powerthesaurus--bow-p (word-point)
+  "Predicate to check whether `WORD-POINT' points to the beginning of the word."
+  (save-excursion
+    ;; If we are at the beginning of a word
+    ;; this will take us to the beginning of the previous word.
+    ;; Otherwise, this will take us to the beginning of the current word.
+    (backward-word)
+    ;; This will take us to the end of the previous word or to the end
+    ;; of the current word depending on whether we were at the beginning
+    ;; of a word.
+    (forward-word)
+    ;; Compare our original position with wherever we're now to
+    ;; separate those two cases
+    (< (point) word-point)))
 
 (defun powerthesaurus-compose-url (word)
   "Compose a powerthesaurus url to request `WORD'."
@@ -185,18 +183,6 @@ For now, it supports upcase and capitalize."
           (sort synonyms (lambda (x y) (< (powerthesaurus-word-rating x)
                                           (powerthesaurus-word-rating y))))))
 
-(defun powerthesaurus-get-rating (word)
-  "Get a numeric user rating of the given `WORD'."
-  ;; TODO: get rid of it when jeison supports functional
-  ;; components of the path
-  (string-to-number (oref word rating)))
-
-(jeison-defclass powerthesaurus-word nil
-                 ((text :initarg :text :type string :path term
-                        :documentation "Actual text of the word from Powerthesaurus")
-                  (rating :initarg :rating
-                          :documentation "User rating of the word")))
-
 (cl-defstruct (powerthesaurus-word) text rating)
 
 (defun powerthesaurus-parse-response (data)
@@ -208,33 +194,12 @@ For now, it supports upcase and capitalize."
   "Get text information from all provided `NODES'."
   (mapcar #'dom-text nodes))
 
-(defun powerthesaurus-find-store-json (scripts)
-  "Find and parse the store JSON out of all `SCRIPTS' nodes."
-  (let* ((matches (mapcar #'powerthesaurus-match-store scripts))
-         (match (powerthesaurus-find-good-match matches)))
-    (powerthesaurus-get-json match)))
-
-(defun powerthesaurus-match-store (script-text)
-  "Find store JSON in `SCRIPT-TEXT'."
-  (s-match-strings-all
-   (rx bol
-       (zero-or-more space)
-       ;; "var store = "
-       "window.__STATE__ = "
-       (group (* (not (any ";"))))
-       )
-   script-text))
-
 (defun powerthesaurus-find-good-match (matches)
   "Filter all `MATCHES' to find the one to parse synonyms from."
   (let ((match (seq-find #'identity matches nil)))
     (if match
         match
       (error "Couldn't find anything"))))
-
-(defun powerthesaurus-get-json (match)
-  "Parse `MATCH' json into an alist."
-  (json-read-from-string (nth 1 (car match))))
 
 (defun powerthesaurus-retrieve-synonyms (raw-data)
   "Get synonyms list from DOM."
