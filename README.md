@@ -12,32 +12,48 @@
 
 ## How to use
 
-**emacs-powerthesaurus** defines a single interactive function, namely `powerthesaurus-lookup-dwim`, which asks for the type of the query and tries to infer the term that the user wants to retrieve synonyns, antonyms, etc for.
+**emacs-powerthesaurus** defines a single interactive function, namely `powerthesaurus-lookup-dwim`,
+should be used for retrieving results from [powerthesaurus.org](https://www.powerthesaurus.org).
+This command asks for the type of the query to perform and tries to infer the term for which
+synonyms, antonyms, etc. should be downloaded.
 
 Particularly:
-* If the region is active, this command assumes that results (e.g., synonyms, antonyms, etc) for the selected text should be downloaded from [powerthesaurus.org](https://www.powerthesaurus.org).
-* If the region is not active and point is located at a word, it assumes that the word under point should be searched for.
-* In any other case, it will directly prompt the user for the phrase to search.
+* If the region is active, the search term defaults to the region's contents.
+* If the region is inactive and point is located at a word, the search term defaults to that word.
+* In any other case, the user will be directly prompted for the phrase to search.
 
-At this point, the following types of query are supported:
+Currently, the following query types are supported:
 * synonyms,
 * antonyms,
 * related terms,
 * definitions, and
 * sentences.
 
-Finally, `powerthesaurus-lookup-dwim` can either replace the original phrase with one of the fetched results, insert a selected result at point or
-display the list of all results in a pop-up buffer. By default, results of "synonyms", "antonyms" and "related" queries will be inserted in place whereas results of
-sentences and definitions are displayed separately, although one can force either of these two behaviors through the prefix argument (i.e., <kbd>C-u ...<kbd>).
+Depending on the type of query performed, 
+`powerthesaurus-lookup-dwim` will either 
+replace the original term with one of the fetched results,
+insert a selected result at point, or
+display the list of all results in a pop-up buffer. 
+By default,
+results corresponding to "synonyms", "antonyms" and "related" queries
+will be inserted in place 
+whereas
+results for sentences and definitions are displayed separately, 
+although one can override this behavior through the prefix argument (i.e., 
+<kbd>C-u M-x powerthesaurus-lookup-dwim</kbd> will cause to replace/insert 
+the selected result in the current buffer independently of the query's type).
 
-For the sake of convenience, the following commands are also provided which wrap around `powerthesaurus-lookup-dwim` and provide a quick way to perform a specific type of query:
+For the sake of convenience, 
+the following commands are also provided 
+which wrap around `powerthesaurus-lookup-dwim` and 
+provide a quick way to perform a specific type of query:
 * `powerthesaurus-lookup-synonyms-dwim`
 * `powerthesaurus-lookup-antonyms-dwim`
 * `powerthesaurus-lookup-related-dwim`
 * `powerthesaurus-lookup-definitions-dwim`
 * `powerthesaurus-lookup-sentences-dwim`
 
-Additionally, for non-interactive use, the function `powerthesaurus-lookup` is provided.
+Finally, the function `powerthesaurus-lookup` is provided for non-interactive use.
 
 ## Old API
 The following subsections describe the now obsolete API before version 0.2, which is still provided for the time being although use of it should 
@@ -63,11 +79,9 @@ If you have any active selection, `powerthesaurus-lookup-word` fetches selected 
 
 ### Version 0.2.0
 
-* Revamp the package's overall architecture,
-  introducing a new, more compact API and commands while better
-  organizing its internals.
+* Revamp the package's overall architecture.
 * Extend mechanism allowing different types of queries, namely
-  "synonyms, "antonyms", "related", "definitions", and "sentences".
+  synonyms, antonyms, related terms, definitions, and sentences.
 * Support queries involving terms that consist of multiple words (e.g.,
   "give up").
 * Fix Github issues #13, #14, #15 and #17.
