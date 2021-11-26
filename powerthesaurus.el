@@ -513,7 +513,7 @@ If a region is selected use powerthesaurus-lookup-word
 if a thing at point is not empty use powerthesaurus-lookup-word-at-point
 otherwise as for word using powerthesaurus-lookup-word"
   (interactive)
-  (let (beg end bounds)
+  (let (beg end)
     ;; selection is active -> look up whatever is selected
     (if (use-region-p)
         (progn
