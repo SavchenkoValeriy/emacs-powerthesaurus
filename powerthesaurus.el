@@ -228,7 +228,7 @@ the contents of the current active region are used."
   "Ask the user for which word to look up.
 If PROMPT is not specified, a default one will be used."
   (setq prompt (or prompt "Phrase to fetch: "))
-  (list (read-string (substring-no-properties prompt)) nil nil))
+  (list (substring-no-properties (read-string prompt)) nil nil))
 
 (defun powerthesaurus--make-callback (original-phrase query-type
                                                       &optional beg end)
