@@ -52,16 +52,16 @@
 (defconst powerthesaurus-supported-query-types
   (list "synonyms" "antonyms" "related" "definitions" "sentences"))
 
-(defun powerthesaurus-compose-url (original-phrase query-type)
-  "Build and return powerthesaurus url to look up ORIGINAL-PHRASE.
+(defun powerthesaurus-compose-url (query-term query-type)
+  "Build and return powerthesaurus url to look up QUERY-TERM.
 
 QUERY-TYPE must be an element of `powerthesaurus-supported-query-types'."
   (unless (member query-type powerthesaurus-supported-query-types)
     (error "Unknown query type '%s'" query-type))
   (format "https://www.powerthesaurus.org/%s/%s"
-          ;; Escape text of original-phrase,
+          ;; Escape text of query-term,
           ;; in order to properly handle spaces, etc.
-          (url-encode-url original-phrase)
+          (url-encode-url query-term)
           query-type))
 
 ;;;###autoload
@@ -78,16 +78,16 @@ The argument passed to QUERY-TYPE should be the same as in
 `powerthesaurus-lookup' or nil; in the latter case,
 the user will be prompt for a valid value."
   (interactive "P")
-  (pcase-let ((`(,original-phrase ,beg ,end)
+  (pcase-let ((`(,query-term ,beg ,end)
                ;; selection is active -> look up whatever is selected
                (if (use-region-p)
-                   (powerthesaurus--extract-original-phrase)
+                   (powerthesaurus--extract-query-region)
                  ;; point is is at a word -> look it up
                  (if (thing-at-point 'word)
                      (powerthesaurus--extract-original-word)
                    ;; nothing appropriate nearby -> ask the user
                    (list nil nil nil)))))
-    (setq original-phrase (read-string "Phrase: " original-phrase)
+    (setq query-term (read-string "Term: " query-term)
           query-type (or query-type
                          (completing-read "Query type: "
                                           powerthesaurus-supported-query-types
@@ -100,7 +100,7 @@ the user will be prompt for a valid value."
      ((eq action-type 'action-display)
       (when (or beg end)
         (setq beg nil end nil))))
-    (funcall 'powerthesaurus-lookup original-phrase query-type beg end)))
+    (funcall 'powerthesaurus-lookup query-term query-type beg end)))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-synonyms-dwim (&optional action-type)
@@ -138,12 +138,12 @@ ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (powerthesaurus-lookup-dwim action-type "sentences"))
 
 ;;;###autoload
-(defun powerthesaurus-lookup (original-phrase query-type &optional beg end)
-  "Retrieve the given ORIGINAL-PHRASE's synonyms, antonyms, etc... online.
+(defun powerthesaurus-lookup (query-term query-type &optional beg end)
+  "Retrieve the given QUERY-TERM's synonyms, antonyms, etc... online.
 
 Argument QUERY-TYPE specifies the type of query and must be an element of
 `powerthesaurus-supported-query-types'.
-ORIGINAL-PHRASE corresponds to the word/term/sentence to look up.
+QUERY-TERM corresponds to the word/term/sentence to look up.
 
 If specified, BEG and END specify the beginning and end positions of
 the text in the buffer to be replaced by the selected result.
@@ -154,9 +154,9 @@ the results to be inserted at BEG.  Finally, if both BEG and END are specified
 and are different, then the user will be prompted to select a result
 which will replace the text between these bounds."
   (powerthesaurus--query
-   original-phrase
+   query-term
    query-type
-   (powerthesaurus--make-callback original-phrase query-type beg end)))
+   (powerthesaurus--make-callback query-term query-type beg end)))
 
 (defun powerthesaurus-prefix-to-action (uarg qtype)
   "Map given prefix argument UARG to corresponding action type.
@@ -203,9 +203,9 @@ default to cursor's current location."
       (setq beg (point))
       (forward-word)
       (setq end (point))
-      (powerthesaurus--extract-original-phrase beg end))))
+      (powerthesaurus--extract-query-region beg end))))
 
-(defun powerthesaurus--extract-original-phrase (&optional beg end)
+(defun powerthesaurus--extract-query-region (&optional beg end)
   "Parse the phrase in region.
 
 If optional arguments BEG and END are not specified,
@@ -222,34 +222,34 @@ the contents of the current active region are used."
         (substring-and-bounds beg end)
       (if (use-region-p)
           (substring-and-bounds (region-beginning) (region-end))
-        (error "Failed parsing original phrase from active region")))))
+        (error "Failed parsing query term from active region")))))
 
-(defun powerthesaurus--read-original-phrase (&optional prompt)
+(defun powerthesaurus--read-query-term (&optional prompt)
   "Ask the user for which word to look up.
 If PROMPT is not specified, a default one will be used."
-  (setq prompt (or prompt "Phrase to fetch: "))
+  (setq prompt (or prompt "Term: "))
   (list (substring-no-properties (read-string prompt)) nil nil))
 
-(defun powerthesaurus--make-callback (original-phrase query-type
-                                                      &optional beg end)
+(defun powerthesaurus--make-callback (query-term query-type
+                                                 &optional beg end)
   "Generate a callback to be executed upon successful completion of request.
 
 If BEG and/or END are non-nil, then `powerthesaurus--make-insert-callback'
 will be used as the underlying callback generator, otherwise it defaults to
 `powerthesaurus--make-display-callback'.
 
-QUERY-TYPE and ORIGINAL-PHRASE will be passed to
+QUERY-TYPE and QUERY-TERM will be passed to
 the underlying callback generator, possibly altering its behavior to
 better accommodate the corresponding type of query."
   (cond
    ((or beg end)
-    (powerthesaurus--make-insert-callback original-phrase query-type
+    (powerthesaurus--make-insert-callback query-term query-type
                                           (current-buffer)
                                           beg end))
    (t
-    (powerthesaurus--make-display-callback original-phrase query-type))))
+    (powerthesaurus--make-display-callback query-term query-type))))
 
-(defun powerthesaurus--make-insert-callback (original-phrase
+(defun powerthesaurus--make-insert-callback (query-term
                                              query-type
                                              buffer beg end)
   "Generate a callback that will insert the query's result to buffer.
@@ -264,11 +264,11 @@ Otherwise, if BEG and END differ,
 then the region between these points will be replaced by the selected result.
 BEG must be non-nil.
 
-BUFFER is the buffer object where original phrase will be replaced and
+BUFFER is the buffer object where term will be replaced and
 should be explicitly specified since, in case of asynchronous execution,
 the callback may be executed with cursor under a different buffer.
 
-ORIGINAL-PHRASE corresponds to the text to be replaced by
+QUERY-TERM corresponds to the text to be replaced by
 the generated callback, and BEG and END correspond to the substituted text's
 beginning and ending positions within the buffer.
 
@@ -292,9 +292,9 @@ creating the corresponding request."
          (funcall backend
                   (powerthesaurus--select-candidate
                    (powerthesaurus--response-extract data query-type))
-                  original-phrase))))))
+                  query-term))))))
 
-(defun powerthesaurus--make-display-callback (original-phrase query-type)
+(defun powerthesaurus--make-display-callback (query-term query-type)
   "Generate a callback that will display the query's results to another buffer.
 
 The callback generated by this function accepts the data belonging to
@@ -302,7 +302,7 @@ the response to a previously made request as its sole argument.
 The results of the query will then be extracted and displayed on
 a different buffer.
 
-ORIGINAL-PHRASE corresponds to the original text that was queried online.
+QUERY-TERM corresponds to the original text that was queried online.
 
 QUERY-TYPE must be an element of `powerthesaurus-supported-query-types' and
 is used for determining how to parse the aforementioned data.
@@ -318,13 +318,13 @@ in the buffer."
      (with-local-quit
        (powerthesaurus--display-results
         (powerthesaurus--response-extract data query-type)
-        original-phrase
+        query-term
         query-type)))))
 
-(defun powerthesaurus--query (phrase type &optional callback sync)
+(defun powerthesaurus--query (term type &optional callback sync)
   "Send query to 'powerthesaurus.org' and handle response.
 
-PHRASE corresponds to the phrase to look up and
+TERM corresponds to the phrase to look up and
 TYPE must be an element of `powerthesaurus-supported-query-types' (e.g.,
 \"synonyms\").
 
@@ -336,7 +336,7 @@ Finally, if SYNC is non-nil, the function will wait for the response from
 If not specified, the value of `powerthesaurus-synchronous-requests'
 will determine this behavior."
   (request
-    (powerthesaurus-compose-url phrase type)
+    (powerthesaurus-compose-url term type)
     :parser (lambda () (libxml-parse-html-region (point) (point-max)))
     :headers powerthesaurus-request-headers
     :success callback
@@ -353,7 +353,7 @@ BEG and END correspond to the bounds of the selected text to be replaced."
   (powerthesaurus--insert-text replacement original (min beg end)))
 
 (defun powerthesaurus--preprocess-text (text reference)
-  "Adjust cases of the TEXT phrase based on the REFERENCE one.
+  "Adjust cases of TEXT according on REFERENCE.
 
 For now, it supports upcasing and capitalization."
   (cond ((s-uppercase-p reference) (upcase text))
@@ -361,21 +361,21 @@ For now, it supports upcasing and capitalization."
         (t text)))
 
 (defun powerthesaurus--insert-text (text reference &optional pnt)
-  "Insert text at the point after preprocessing it based on reference text.
+  "Insert TEXT at the point after preprocessing it according to REFERENCE.
 
-REFERENCE represents the phrase associated with the TEXT to be inserted.
+REFERENCE corresponds to the term whose query yielded TEXT.
 
 If optional argument PNT is given, the insert text there.  Otherwise,
 insert text under cursor."
   (when pnt (goto-char pnt))
   (insert (powerthesaurus--preprocess-text text reference)))
 
-(defun powerthesaurus--display-results (results original-phrase query-type
+(defun powerthesaurus--display-results (results query-term query-type
                                                 &optional sep)
   "Display results on a dedicated buffer.
 
 RESULTS must be a list of `powerthesaurus-result' instances.
-ORIGINAL-PHRASE and QUERY-TYPE must be the text that was queried online
+QUERY-TERM and QUERY-TYPE must be the text that was queried online
 and the corresponding query type that yielded the results to be displayed.
 
 Optional argument SEP is the string that will be used to separate
@@ -388,7 +388,7 @@ its default value varies depending on value of QUERY-TYPE."
      (t (setq sep "\n"))))
   (let ((buf (get-buffer-create
               (format "*Powerthesaurus - \"%s\" - %s*"
-                      original-phrase query-type))))
+                      query-term query-type))))
     (with-current-buffer buf
       (dolist (elt results)
         (insert (powerthesaurus-result-text elt) sep)))
@@ -546,8 +546,8 @@ In this case, a selected synonym will be inserted at the point."
      (list nil nil)))
   (pcase-let ((`(,word _ _)
                (if beginning
-                   (powerthesaurus--extract-original-phrase beginning end)
-                 (powerthesaurus--read-original-phrase "Word to fetch: "))))
+                   (powerthesaurus--extract-query-region beginning end)
+                 (powerthesaurus--read-query-term "Word to fetch: "))))
     (powerthesaurus-lookup word "synonyms" (or beginning (point)) end)))
 
 (make-obsolete 'powerthesaurus-lookup-word
