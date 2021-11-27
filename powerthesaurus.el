@@ -498,7 +498,7 @@ its default value varies depending on value of QUERY-TYPE."
 
 ;; Define old API's now deprecated functions.
 
- ;;;###autoload
+;;;###autoload
 (defun powerthesaurus-lookup-word-dwim ()
   "Wrapper function for powerthesaurus-lookup-word commands.
 
@@ -519,6 +519,7 @@ otherwise as for word using powerthesaurus-lookup-word"
         ;; nothing appropriate nearby -> ask the user
         (powerthesaurus-lookup-word)))))
 
+;;;###autoload
 (defun powerthesaurus-lookup-word-at-point (word-point)
   "Find word at `WORD-POINT', look it up in powerthesaurs, and replace it."
   (interactive (list (point)))
@@ -526,6 +527,7 @@ otherwise as for word using powerthesaurus-lookup-word"
                (powerthesaurus--extract-original-word word-point)))
     (powerthesaurus-lookup word "synonyms" beg end)))
 
+;;;###autoload
 (defun powerthesaurus-lookup-word (&optional beginning end)
   "Find the given word's synonyms at powerthesaurus.org.
 
