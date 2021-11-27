@@ -399,26 +399,19 @@ its default value varies depending on value of QUERY-TYPE."
   "Prompt the user to select one of the CANDIDATES returned from a query."
   (print candidates)
   (let* ((candidates-sorted (powerthesaurus--sort-candidates candidates))
+         ;; this is the only way we can keep the order while using
+         ;; the default implementation of completing-read function
+         ;; see: https://emacs.stackexchange.com/a/41808/23751
+         (completion-table
+          (lambda (string pred action)
+            (if (eq action 'metadata)
+                '(metadata (display-sort-function . identity)
+                           (cycle-sort-function . identity))
+              (complete-with-action
+               action candidates-sorted string pred))))
          ;; ivy still will try to sort it lexicographically: deny it
          (ivy-sort-functions-alist '((t . (lambda (x y) 0)))))
-    (completing-read "Choose a candidate: " candidates-sorted nil t)))
-
-;; (defun powerthesaurus--select-candidate (candidates)
-;;   "Prompt the user to select one of the CANDIDATES returned from a query."
-;;   (let* ((candidates-sorted (powerthesaurus--sort-candidates candidates))
-;;          ;; this is the only way we can keep the order while using
-;;          ;; the default implementation of completing-read function
-;;          ;; see: https://emacs.stackexchange.com/a/41808/23751
-;;          (completion-table
-;;           (lambda (string pred action)
-;;             (if (eq action 'metadata)
-;;                 '(metadata (display-sort-function . identity)
-;;                            (cycle-sort-function . identity))
-;;               (complete-with-action
-;;                action candidates-sorted string pred))))
-;;          ;; ivy still will try to sort it lexicographically: deny it
-;;          (ivy-sort-functions-alist nil))
-;;     (completing-read "Choose a candidate: " completion-table nil nil)))
+    (completing-read "Choose a candidate: " completion-table nil nil)))
 
 (defun powerthesaurus--sort-candidates (synonyms)
   "Compose choices from the `powerthesaurus-result' list of SYNONYMS."
