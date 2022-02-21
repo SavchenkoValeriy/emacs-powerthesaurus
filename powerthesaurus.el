@@ -447,7 +447,8 @@ its default value varies depending on value of QUERY-TYPE."
           (dom-children
            (dom-children
             (dom-children
-             (dom-by-tag data 'main)))))
+             (dom-children
+              (dom-by-tag data 'main))))))
          (results (cl-map 'list
                           (lambda (it)
                             (dom-text
