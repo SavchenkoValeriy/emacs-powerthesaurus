@@ -77,6 +77,10 @@ If you have any active selection, `powerthesaurus-lookup-word` fetches selected 
 
 ## Changelog
 
+### Version 0.2.2
+* Remove redundant headers in request messages to server that potentially cause
+  failure to parse received candidates (Github issue #16).
+
 ### Version 0.2.1
 * Fix regression involving result sorting during selection.
 * Fix minor bugs.
