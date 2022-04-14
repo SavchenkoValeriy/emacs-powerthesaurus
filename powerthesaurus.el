@@ -41,7 +41,6 @@
 (defvar powerthesaurus-request-headers
   '(("User-Agent" . "Chrome/74.0.3729.169")
     ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-    ("Accept-Encoding" . "gzip, deflate, br")
     ("Accept-Language" . "en,en-US;q=0.5")
     ("Upgrade-Insecure-Requests" . "1"))
   "List of headers included in the request sent to 'powerthesaurus.org'.")
