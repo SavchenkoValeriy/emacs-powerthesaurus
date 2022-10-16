@@ -390,8 +390,12 @@ its default value varies depending on value of QUERY-TYPE."
                       query-term query-type))))
     (with-current-buffer buf
       (dolist (elt results)
-        (insert (powerthesaurus-result-text elt) sep)))
+       (insert (powerthesaurus-result-text elt) sep)
     ;; TODO: Make buffer disposable via `keyboard-quit'.
+       (goto-char (point-min))
+       (local-set-key [backspace] 'scroll-down)
+       (local-set-key " " 'scroll-up)
+       (local-set-key (kbd "q") 'delete-window)))
     (pop-to-buffer buf)))
 
 (defun powerthesaurus--select-candidate (candidates)
