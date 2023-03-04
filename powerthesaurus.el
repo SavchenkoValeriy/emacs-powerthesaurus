@@ -385,13 +385,19 @@ its default value varies depending on value of QUERY-TYPE."
      ((member query-type '("definitions" "sentences"))
       (setq sep "\n----------------\n"))
      (t (setq sep "\n"))))
-  (let ((buf (get-buffer-create
-              (format "*Powerthesaurus - \"%s\" - %s*"
-                      query-term query-type))))
+  (let* ((buf-name (format "*Powerthesaurus - \"%s\" - %s*"
+                           query-term query-type))
+         (buf-exists (get-buffer buf-name))
+         (buf (or buf-exists (get-buffer-create buf-name))))
     (with-current-buffer buf
+      (when buf-exists
+        (fundamental-mode)
+        (read-only-mode -1)
+        (erase-buffer))
       (dolist (elt results)
-        (insert (powerthesaurus-result-text elt) sep)))
-    ;; TODO: Make buffer disposable via `keyboard-quit'.
+        (insert (powerthesaurus-result-text elt) sep))
+      (help-mode)
+      (goto-char (point-min)))
     (pop-to-buffer buf)))
 
 (defun powerthesaurus--select-candidate (candidates)
