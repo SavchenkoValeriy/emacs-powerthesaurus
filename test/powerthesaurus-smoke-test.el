@@ -29,28 +29,27 @@
     (powerthesaurus--query
      term
      type
-     (cl-function
-      (lambda (&key data &allow-other-keys)
-        (setq results (powerthesaurus--response-extract data type))))
+     (lambda (data)
+       (setq results data))
      t)
     results))
 
 (ert-deftest powerthesaurus:check-synonyms ()
-  (let ((results (powerthesaurus:test-get "good" "synonyms")))
+  (let ((results (powerthesaurus:test-get "good" :synonyms)))
     (should (> (length results) 0))))
 
 (ert-deftest powerthesaurus:check-antonyms ()
-  (let ((results (powerthesaurus:test-get "good" "antonyms")))
+  (let ((results (powerthesaurus:test-get "good" :antonyms)))
     (should (> (length results) 0))))
 
 (ert-deftest powerthesaurus:check-related ()
-  (let ((results (powerthesaurus:test-get "good" "related")))
+  (let ((results (powerthesaurus:test-get "good" :related)))
     (should (> (length results) 0))))
 
 (ert-deftest powerthesaurus:check-definitions ()
-  (let ((results (powerthesaurus:test-get "good" "definitions")))
+  (let ((results (powerthesaurus:test-get "good" :definitions)))
     (should (> (length results) 0))))
 
 (ert-deftest powerthesaurus:check-sentences ()
-  (let ((results (powerthesaurus:test-get "good" "sentences")))
+  (let ((results (powerthesaurus:test-get "good" :sentences)))
     (should (> (length results) 0))))
