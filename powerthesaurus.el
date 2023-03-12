@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.2.2
-;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0"))
+;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0") (jeison "1.0.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -33,6 +33,7 @@
 ;;; Code:
 (require 'dom)
 (require 'request)
+(require 'jeison)
 ;; TODO: Remove unnecessary dependencies.
 ;; (require 'rx)
 (require 's)
@@ -40,16 +41,14 @@
 
 (defvar powerthesaurus-request-headers
   '(("User-Agent" . "Chrome/74.0.3729.169")
-    ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-    ("Accept-Language" . "en,en-US;q=0.5")
-    ("Upgrade-Insecure-Requests" . "1"))
+    ("Content-Type" . "application/json"))
   "List of headers included in the request sent to 'powerthesaurus.org'.")
 
 (defvar powerthesaurus-synchronous-requests nil
   "If non-nil, requests send to 'powerthesaurus.org' are synchronous.")
 
 (defconst powerthesaurus-supported-query-types
-  (list "synonyms" "antonyms" "related" "definitions" "sentences"))
+  (list :synonyms :antonyms :related :definitions :sentences))
 
 (defun powerthesaurus-compose-url (query-term query-type)
   "Build and return powerthesaurus url to look up QUERY-TERM.
@@ -62,6 +61,8 @@ QUERY-TYPE must be an element of `powerthesaurus-supported-query-types'."
           ;; in order to properly handle spaces, etc.
           (url-encode-url query-term)
           query-type))
+
+(defconst powerthesaurus-api-url "https://api.powerthesaurus.org")
 
 ;;;###autoload
 (defun powerthesaurus-lookup-dwim (&optional action-type query-type)
@@ -106,35 +107,35 @@ the user will be prompt for a valid value."
   "Wrapper function for synonym lookup.
 ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (interactive "P")
-  (powerthesaurus-lookup-dwim action-type "synonyms"))
+  (powerthesaurus-lookup-dwim action-type :synonyms))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-antonyms-dwim (&optional action-type)
   "Wrapper function for antonym lookup.
 ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (interactive "P")
-  (powerthesaurus-lookup-dwim action-type "antonyms"))
+  (powerthesaurus-lookup-dwim action-type :antonyms))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-related-dwim (&optional action-type)
   "Wrapper function for related lookup.
 ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (interactive "P")
-  (powerthesaurus-lookup-dwim action-type "related"))
+  (powerthesaurus-lookup-dwim action-type :related))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-definitions-dwim (&optional action-type)
   "Wrapper function for definition lookup.
 ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (interactive "P")
-  (powerthesaurus-lookup-dwim action-type "definitions"))
+  (powerthesaurus-lookup-dwim action-type :definitions))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-sentences-dwim (&optional action-type)
   "Wrapper function for sentence lookup.
 ACTION-TYPE accepts the same arguments as in `powerthesaurus-lookup-dwim'."
   (interactive "P")
-  (powerthesaurus-lookup-dwim action-type "sentences"))
+  (powerthesaurus-lookup-dwim action-type :sentences))
 
 ;;;###autoload
 (defun powerthesaurus-lookup (query-term query-type &optional beg end)
@@ -157,6 +158,10 @@ which will replace the text between these bounds."
    query-type
    (powerthesaurus--make-callback query-term query-type beg end)))
 
+;; ===============================================================
+;; UX functions implementation
+;; ===============================================================
+
 (defun powerthesaurus-prefix-to-action (uarg qtype)
   "Map given prefix argument UARG to corresponding action type.
 
@@ -178,15 +183,13 @@ then the result defaults to `action-insert'.
 In any other case, it defaults to `action-display'."
   (cond
    ((null uarg)
-    (if (member qtype '("synonyms" "antonyms" "related"))
+    (if (member qtype '(:synonyms :antonyms :related))
         'action-insert
       'action-display))
    ((memq uarg '(action-insert action-display)) uarg)
    ((equal uarg '(4)) 'action-insert)
    ((equal uarg '(16)) 'action-display)
    (t (error "Unexpected prefix argument"))))
-
-(cl-defstruct (powerthesaurus-result) text rating)
 
 (defun powerthesaurus--extract-original-word (&optional pnt)
   "Parse the word under point to look up.
@@ -283,15 +286,10 @@ creating the corresponding request."
                    (lambda (new original)
                      (with-current-buffer buffer
                        (powerthesaurus--replace-text new beg end original))))))
-    (cl-function
-     (lambda (&key data &allow-other-keys)
-       ;; in order to allow users to quit powerthesaurus
-       ;; prompt with C-g, we need to wrap callback with this
-       (with-local-quit
-         (funcall backend
-                  (powerthesaurus--select-candidate
-                   (powerthesaurus--response-extract data query-type))
-                  query-term))))))
+    (lambda (results)
+      (funcall backend
+               (powerthesaurus--select-candidate results)
+               query-term))))
 
 (defun powerthesaurus--make-display-callback (query-term query-type)
   "Generate a callback that will display the query's results to another buffer.
@@ -310,38 +308,11 @@ creating the corresponding request.
 Additionally, it affects aspects of the generated callback's behavior,
 such as the default string used for separating the results displayed
 in the buffer."
-  (cl-function
-   (lambda (&key data &allow-other-keys)
-     ;; in order to allow users to quit powerthesaurus
-     ;; prompt with C-g, we need to wrap callback with this
-     (with-local-quit
-       (powerthesaurus--display-results
-        (powerthesaurus--response-extract data query-type)
-        query-term
-        query-type)))))
-
-(defun powerthesaurus--query (term type &optional callback sync)
-  "Send query to 'powerthesaurus.org' and handle response.
-
-TERM corresponds to the phrase to look up and
-TYPE must be an element of `powerthesaurus-supported-query-types' (e.g.,
-\"synonyms\").
-
-Optional argument CALLBACK must be a function to be called upon
-successfully completing the request.
-
-Finally, if SYNC is non-nil, the function will wait for the response from
-'powerthesaurus.org' before returning.
-If not specified, the value of `powerthesaurus-synchronous-requests'
-will determine this behavior."
-  (request
-    (powerthesaurus-compose-url term type)
-    :parser (lambda () (libxml-parse-html-region (point) (point-max)))
-    :headers powerthesaurus-request-headers
-    :success callback
-    :sync (or (null callback)
-              sync
-              powerthesaurus-synchronous-requests)))
+  (lambda (results)
+    (powerthesaurus--display-results
+     results
+     query-term
+     query-type)))
 
 (defun powerthesaurus--replace-text (replacement beg end original)
   "Pick an alternative from response and replace the selected text.
@@ -352,7 +323,7 @@ BEG and END correspond to the bounds of the selected text to be replaced."
   (powerthesaurus--insert-text replacement original (min beg end)))
 
 (defun powerthesaurus--preprocess-text (text reference)
-  "Adjust cases of TEXT according on REFERENCE.
+  "Adjust cases of TEXT according to REFERENCE.
 
 For now, it supports upcasing and capitalization."
   (cond ((s-uppercase-p reference) (upcase text))
@@ -382,7 +353,7 @@ the displayed results in the buffer.  If not specified,
 its default value varies depending on value of QUERY-TYPE."
   (unless sep
     (cond
-     ((member query-type '("definitions" "sentences"))
+     ((member query-type '(:definitions :sentences))
       (setq sep "\n----------------\n"))
      (t (setq sep "\n"))))
   (let* ((buf-name (format "*Powerthesaurus - \"%s\" - %s*"
@@ -395,7 +366,7 @@ its default value varies depending on value of QUERY-TYPE."
         (read-only-mode -1)
         (erase-buffer))
       (dolist (elt results)
-        (insert (powerthesaurus-result-text elt) sep))
+        (insert (oref elt text) sep))
       (help-mode)
       (goto-char (point-min)))
     (pop-to-buffer buf)))
@@ -420,77 +391,124 @@ its default value varies depending on value of QUERY-TYPE."
 
 (defun powerthesaurus--sort-candidates (synonyms)
   "Compose choices from the `powerthesaurus-result' list of SYNONYMS."
-  (mapcar (lambda (word) (powerthesaurus-result-text word))
-          (sort synonyms (lambda (x y) (< (powerthesaurus-result-rating x)
-                                          (powerthesaurus-result-rating y))))))
+  (mapcar (lambda (word) (oref word text))
+          (sort synonyms (lambda (x y) (< (oref x rating)
+                                     (oref y rating))))))
 
-(defun powerthesaurus--response-extract (data type)
-  "Extract specified TYPE from response's DATA."
-  (cond
-   ((member type '("synonyms" "antonyms" "related"))
-    (powerthesaurus--response-extract-sar data))
-   ((member type '("definitions"))
-    (powerthesaurus--response-extract-definitions data))
-   ((member type '("sentences"))
-    (powerthesaurus--response-extract-sentences data))
-   (t (error "Unknown query type '%s'" type))))
+;; ===============================================================
+;; Requests and JSON parsing
+;; ===============================================================
 
-(defun powerthesaurus--response-extract-sar (data)
-  "Extract synonyms, antonyms or related from response's DATA."
-  (let* ((results
-          (cl-map 'list (lambda (it) (dom-text (dom-by-tag it 'a)))
-                  (dom-by-id data "primary-area")))
-         (results-ranked
-          (cl-loop for elt in results and n from 0 by 1
-                   collect (make-powerthesaurus-result :text elt
-                                                       :rating n))))
-    results-ranked))
+(jeison-defclass powerthesaurus-result nil
+  ((text :initarg :text :type string :path (node targetTerm name)
+         :documentation "Actual text of the word from Powerthesaurus")
+   (rating :initarg :rating :type number :path (node rating)
+           :documentation "User rating of the word")))
 
-(defun powerthesaurus--response-extract-definitions (data)
-  "Extract definitions from response's DATA."
-  (let* ((results
-          (dom-children
-           (dom-children
-            (dom-children
-             (dom-children
-              (dom-by-tag data 'main))))))
-         (results (cl-map 'list
-                          (lambda (it)
-                            (dom-text
-                             (nth 1 (dom-children
-                                     (nth 1 (dom-children
-                                             (dom-children it)))))))
-                          results))
-         (results-ranked
-          (cl-loop for elt in results and n from 0 by 1
-                   collect (make-powerthesaurus-result :text elt
-                                                       :rating n))))
-    results-ranked))
+(jeison-defclass powerthesaurus-definition nil
+  ((text :initarg :text :type string :path (node definition)
+         :documentation "Definition from Powerthesaurus")
+   (rating :initarg :rating :type number :path (node rating)
+           :documentation "User rating of the definition")))
 
-(defun powerthesaurus--response-extract-sentences (data)
-  "Extract sentences from response's DATA."
-  (let* ((results
-          (dom-children
-           (dom-children
-            (dom-children
-             (dom-by-tag data 'main)))))
-         (results (cl-map 'list
-                          (lambda (it)
-                            (dom-texts
-                             (dom-children
-                              (nth 1 (dom-children
-                                      (dom-children it)))) ""))
-                          (dom-children results)))
-         (results (cl-map 'list
-                          (lambda (it)
-                            (s-chop-prefix "\""
-                                           (s-chop-suffix "\"" it)))
-                          results))
-         (results-ranked
-          (cl-loop for elt in results and n from 0 by 1
-                   collect (make-powerthesaurus-result :text elt
-                                                       :rating n))))
-    results-ranked))
+(jeison-defclass powerthesaurus-sentence nil
+  ((text :initarg :text :type string :path (node sentence)
+         :documentation "Sentence example from Powerthesaurus")
+   (rating :initarg :rating :type number :path (node rating)
+           :documentation "User rating of the sentence")))
+
+(defun powerthesaurus--query (term type &optional callback sync)
+  "TBD"
+  (let ((query (pcase type
+                 ((pred powerthesaurus--is-thesaurus-query-type)
+                  #'powerthesaurus--query-thesaurus)
+                 (:definitions #'powerthesaurus--query-definition)
+                 (:sentences #'powerthesaurus--query-sentence)
+                 (_ (error "Unknown query type '%s'" type)))))
+    (funcall query term type callback sync)))
+
+(defun powerthesaurus--request-term-id (term callback &optional sync)
+  (powerthesaurus--api-query
+   `(("query" . ,term))
+   powerthesaurus--search-query
+   callback
+   (lambda (data) (jeison-read t data '(data search terms 0 id)))
+   sync))
+
+(defmacro powerthesaurus--with-term-id (term name sync &rest body)
+  "TBD"
+  (declare (indent 3) (debug t))
+  `(let ((on-success
+          (lambda (,name)
+            ,@body)))
+     (powerthesaurus--request-term-id ,term on-success sync)))
+
+(defun powerthesaurus--query-thesaurus (term type &optional callback sync)
+  "TBD"
+  (powerthesaurus--with-term-id term term-id sync
+    (powerthesaurus--api-query
+     `(("type" . ,(powerthesaurus--type-of-thesaurus-query type))
+       ("termID" . ,term-id)
+       ("sort" .
+        (("field" . "RATING")
+         ("direction" . "DESC"))))
+     powerthesaurus--thesaurus-query
+     callback
+     (lambda (data) (jeison-read '(list-of powerthesaurus-result) data '(data thesauruses edges)))
+     sync)))
+
+(defun powerthesaurus--is-thesaurus-query-type (query-type)
+  "TBD"
+  (member query-type '(:synonyms :antonyms :related)))
+
+(defun powerthesaurus--type-of-thesaurus-query (type)
+  (pcase type
+    (:synonyms "SYNONYM")
+    (:antonyms "ANTONYM")
+    (:related  "RELATED")
+    (_ (error "Unknown thesaurus query type '%s'" type))))
+
+(defun powerthesaurus--query-definition (term type &optional callback sync)
+  "TBD"
+  (powerthesaurus--with-term-id term term-id sync
+    (powerthesaurus--api-query
+     `(("termID" . ,term-id))
+     powerthesaurus--definition-query
+     callback
+     (lambda (data) (jeison-read '(list-of powerthesaurus-definition) data '(data definitions edges)))
+     sync)))
+
+(defun powerthesaurus--query-sentence (term type &optional callback sync)
+  "TBD"
+  (powerthesaurus--with-term-id term term-id sync
+    (powerthesaurus--api-query
+     `(("termID" . ,term-id))
+     powerthesaurus--sentence-query
+     callback
+     (lambda (data) (jeison-read '(list-of powerthesaurus-sentence) data '(data sentences edges)))
+     sync)))
+
+(defun powerthesaurus--api-query (variables query &optional callback postprocess sync)
+  "TBD"
+  (let ((post (or postprocess 'identity)))
+    (request
+      powerthesaurus-api-url
+      :type "POST"
+      :data (json-encode `(("variables" . ,variables)
+                           ("query" . ,query)))
+      :parser #'(lambda () (funcall post (json-parse-buffer :object-type 'alist)))
+      :headers powerthesaurus-request-headers
+      :success (powerthesaurus--wrap-as-callback callback)
+      :sync (or (null callback)
+                sync
+                powerthesaurus-synchronous-requests))))
+
+(defun powerthesaurus--wrap-as-callback (fun)
+  (cl-function
+   (lambda (&key data &allow-other-keys)
+     ;; in order to allow users to quit powerthesaurus
+     ;; prompt with C-g, we need to wrap callback with this
+     (with-local-quit (funcall fun data)))))
 
 (defun powerthesaurus-debug-connection ()
   "Debug requests to powerthesaurus.org."
@@ -531,7 +549,7 @@ otherwise as for word using powerthesaurus-lookup-word"
   (interactive (list (point)))
   (pcase-let ((`(,word ,beg ,end)
                (powerthesaurus--extract-original-word word-point)))
-    (powerthesaurus-lookup word "synonyms" beg end)))
+    (powerthesaurus-lookup word :synonyms beg end)))
 
 ;;;###autoload
 (defun powerthesaurus-lookup-word (&optional beginning end)
@@ -549,7 +567,7 @@ In this case, a selected synonym will be inserted at the point."
                (if beginning
                    (powerthesaurus--extract-query-region beginning end)
                  (powerthesaurus--read-query-term "Word to fetch: "))))
-    (powerthesaurus-lookup word "synonyms" (or beginning (point)) end)))
+    (powerthesaurus-lookup word :synonyms (or beginning (point)) end)))
 
 (make-obsolete 'powerthesaurus-lookup-word
                'powerthesaurus-lookup "0.2.0")
@@ -557,6 +575,58 @@ In this case, a selected synonym will be inserted at the point."
                'powerthesaurus-lookup "0.2.0")
 (make-obsolete 'powerthesaurus-lookup-word-dwim
                'powerthesaurus-lookup "0.2.0")
+
+;; GraphQL queries
+(defconst powerthesaurus--search-query
+  "query SEARCH($query: String!) {
+  search(query: $query) {
+    terms {
+      id
+      name
+    }
+  }
+}")
+
+(defconst powerthesaurus--thesaurus-query
+  "query THESAURUS($termID: ID!, $type: List!, $sort: ThesaurusSorting!)  {
+  thesauruses(termId: $termID, sort: $sort, list: $type) {
+    edges {
+      node {
+        targetTerm {
+          name
+        }
+        rating
+        votes
+      }
+    }
+  }
+}")
+
+(defconst powerthesaurus--definition-query
+  "query DEFINITION($termID: ID!)  {
+  definitions(termId: $termID) {
+    edges {
+      node {
+        definition
+        rating
+        votes
+      }
+    }
+  }
+}")
+
+(defconst powerthesaurus--sentence-query
+  "query SENTENCE($termID: ID!)  {
+  sentences(termId: $termID) {
+    edges {
+      node {
+        sentence
+        rating
+        votes
+      }
+    }
+  }
+}")
 
 (provide 'powerthesaurus)
 ;;; powerthesaurus.el ends here
