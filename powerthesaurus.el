@@ -401,7 +401,12 @@ its default value varies depending on value of QUERY-TYPE."
            :documentation "User rating of the sentence")))
 
 (defun powerthesaurus--query (term type &optional callback sync)
-  "TBD"
+  "Make a query to Powerthesaurus.
+
+TERM is the main text of the query.
+TYPE should be a query type for thesaurus (e.g. ':synonyms' or ':related').
+CALLBACK gets called whenever the response is received and processed.
+SYNC is t for synchronous version of the request."
   (let ((query (pcase type
                  ((pred powerthesaurus--is-thesaurus-query-type)
                   #'powerthesaurus--query-thesaurus)
@@ -411,8 +416,14 @@ its default value varies depending on value of QUERY-TYPE."
     (funcall query term type callback sync)))
 
 (defun powerthesaurus--request-term-id (term callback &optional sync)
-  "TBD"
-  (powerthesaurus--api-query
+  "Request id for the given TERM.
+
+CALLBACK gets called whenever the response is received and processed.
+SYNC is t for synchronous version of the request.
+
+Powerthesaurus APIs require explicit IDs assigned to every term.
+This request fetches it for the further use."
+  (powerthesaurus--query-impl
    `(("query" . ,term))
    powerthesaurus--search-query
    callback
@@ -420,7 +431,10 @@ its default value varies depending on value of QUERY-TYPE."
    sync))
 
 (defmacro powerthesaurus--with-term-id (term name sync &rest body)
-  "TBD"
+  "Request id for the given TERM, bind it to NAME, and execute BODY.
+
+TERM is the term to get ID for.
+SYNC is t for synchronous version of the request."
   (declare (indent 3) (debug t))
   `(let ((on-success
           (lambda (,name)
@@ -428,9 +442,14 @@ its default value varies depending on value of QUERY-TYPE."
      (powerthesaurus--request-term-id ,term on-success sync)))
 
 (defun powerthesaurus--query-thesaurus (term type &optional callback sync)
-  "TBD"
+  "Request thesaurus information from Powerthesaurus.
+
+TERM is the text to get definition for.
+TYPE should be a query type for thesaurus (e.g. ':synonyms' or ':related').
+CALLBACK gets called whenever the response is received and processed.
+SYNC is t for synchronous version of the request."
   (powerthesaurus--with-term-id term term-id sync
-    (powerthesaurus--api-query
+    (powerthesaurus--query-impl
      `(("type" . ,(powerthesaurus--type-of-thesaurus-query type))
        ("termID" . ,term-id)
        ("sort" .
@@ -442,11 +461,11 @@ its default value varies depending on value of QUERY-TYPE."
      sync)))
 
 (defun powerthesaurus--is-thesaurus-query-type (query-type)
-  "TBD"
+  "Return 't' if the given QUERY-TYPE is for thesaurus queries."
   (member query-type '(:synonyms :antonyms :related)))
 
 (defun powerthesaurus--type-of-thesaurus-query (type)
-  "TBD"
+  "Return an API type corresponding to the given query TYPE."
   (pcase type
     (:synonyms "SYNONYM")
     (:antonyms "ANTONYM")
@@ -454,9 +473,14 @@ its default value varies depending on value of QUERY-TYPE."
     (_ (error "Unknown thesaurus query type '%s'" type))))
 
 (defun powerthesaurus--query-definition (term type &optional callback sync)
-  "TBD"
+  "Request definitions from Powerthesaurus.
+
+TERM is the text to get definition for.
+TYPE should be nothing but ':definitions'.
+CALLBACK gets called whenever the response is received and processed.
+SYNC is t for synchronous version of the request."
   (powerthesaurus--with-term-id term term-id sync
-    (powerthesaurus--api-query
+    (powerthesaurus--query-impl
      `(("termID" . ,term-id))
      powerthesaurus--definition-query
      callback
@@ -464,9 +488,14 @@ its default value varies depending on value of QUERY-TYPE."
      sync)))
 
 (defun powerthesaurus--query-sentence (term type &optional callback sync)
-  "TBD"
+  "Request sentences from Powerthesaurus.
+
+TERM is the text for sentence examples.
+TYPE should be nothing but ':sentences'.
+CALLBACK gets called whenever the response is received and processed.
+SYNC is t for synchronous version of the request."
   (powerthesaurus--with-term-id term term-id sync
-    (powerthesaurus--api-query
+    (powerthesaurus--query-impl
      `(("termID" . ,term-id))
      powerthesaurus--sentence-query
      callback
@@ -479,8 +508,14 @@ its default value varies depending on value of QUERY-TYPE."
            (json-available-p))
   (setq powerthesaurus--json-parser #'(lambda () (json-parse-buffer :object-type 'alist))))
 
-(defun powerthesaurus--api-query (variables query &optional callback postprocess sync)
-  "TBD"
+(defun powerthesaurus--query-impl (variables query &optional callback postprocess sync)
+  "Request data from Powerthesaurus GraphQL API.
+
+VARIABLES is an alist of query-specific parameters.
+QUERY is the actual GraphQL query.
+CALLBACK gets called whenever the response is received and processed.
+POSTPROCESS is the additional processing of the JSON response alist.
+SYNC is t for synchronous version of the request."
   (let ((post (or postprocess 'identity)))
     (request
       powerthesaurus-api-url

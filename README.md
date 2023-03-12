@@ -77,6 +77,9 @@ If you have any active selection, `powerthesaurus-lookup-word` fetches selected 
 
 ## Changelog
 
+### Version 0.3.0
+* Migrate from parsing HTML of the page to the use of the API.
+
 ### Version 0.2.2
 * Remove redundant headers in request messages to server that potentially cause
   failure to parse received candidates (Github issue #16).
@@ -93,3 +96,10 @@ If you have any active selection, `powerthesaurus-lookup-word` fetches selected 
 * Support queries involving terms that consist of multiple words (e.g.,
   "give up").
 * Fix Github issues #13, #14, #15 and #17.
+
+## Acknowledgements
+
+I want to give a huge shoutout to the creators of powerthesaurus.org for creating
+such an amazing tool.
+
+Also, kudos to the authors of [alfred-powerthesaurus](https://github.com/clarencecastillo/alfred-powerthesaurus) who figured out internal APIs and whose work I shamelessly copied.
