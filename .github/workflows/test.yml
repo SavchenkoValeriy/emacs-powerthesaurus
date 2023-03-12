@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches:
+      - master
+
+  schedule:
+    - cron: "0 13 * * SAT"
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - macos-12
+          - ubuntu-22.04
+        emacs-version:
+          - 25.3
+          - 26.3
+          - 27.2
+          - 28.1
+    steps:
+      - uses: actions/checkout@v2
+      - uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs-version }}
+      - uses: actions/cache@v3
+        id: cache-cask-packages
+        with:
+          path: .cask
+          key: cache-cask-packages-000
+      - uses: actions/cache@v3
+        id: cache-cask-executable
+        with:
+          path: ~/.cask
+          key: cache-cask-executable-000
+      - uses: cask/setup-cask@master
+        if: steps.cache-cask-executable.outputs.cache-hit != 'true'
+        with:
+          version: snapshot
+      - run: echo "$HOME/.cask/bin" >> $GITHUB_PATH
+      - run: cask install
+      - run: cask exec ert-runner
