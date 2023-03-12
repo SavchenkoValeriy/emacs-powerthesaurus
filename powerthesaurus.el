@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.2.2
-;; Package-Requires: ((emacs "24") (request "0.3.0") (s "1.12.0") (jeison "1.0.0"))
+;; Package-Requires: ((emacs "25.1") (request "0.3.0") (jeison "1.0.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -31,13 +31,8 @@
 ;;; insert selected option in the buffer (depending on the current selection).
 
 ;;; Code:
-(require 'dom)
 (require 'request)
 (require 'jeison)
-;; TODO: Remove unnecessary dependencies.
-;; (require 'rx)
-(require 's)
-(require 'url-util)
 
 (defvar powerthesaurus-request-headers
   '(("User-Agent" . "Chrome/74.0.3729.169")
@@ -49,18 +44,6 @@
 
 (defconst powerthesaurus-supported-query-types
   (list :synonyms :antonyms :related :definitions :sentences))
-
-(defun powerthesaurus-compose-url (query-term query-type)
-  "Build and return powerthesaurus url to look up QUERY-TERM.
-
-QUERY-TYPE must be an element of `powerthesaurus-supported-query-types'."
-  (unless (member query-type powerthesaurus-supported-query-types)
-    (error "Unknown query type '%s'" query-type))
-  (format "https://www.powerthesaurus.org/%s/%s"
-          ;; Escape text of query-term,
-          ;; in order to properly handle spaces, etc.
-          (url-encode-url query-term)
-          query-type))
 
 (defconst powerthesaurus-api-url "https://api.powerthesaurus.org")
 
@@ -428,6 +411,7 @@ its default value varies depending on value of QUERY-TYPE."
     (funcall query term type callback sync)))
 
 (defun powerthesaurus--request-term-id (term callback &optional sync)
+  "TBD"
   (powerthesaurus--api-query
    `(("query" . ,term))
    powerthesaurus--search-query
@@ -462,6 +446,7 @@ its default value varies depending on value of QUERY-TYPE."
   (member query-type '(:synonyms :antonyms :related)))
 
 (defun powerthesaurus--type-of-thesaurus-query (type)
+  "TBD"
   (pcase type
     (:synonyms "SYNONYM")
     (:antonyms "ANTONYM")
@@ -488,6 +473,12 @@ its default value varies depending on value of QUERY-TYPE."
      (lambda (data) (jeison-read '(list-of powerthesaurus-sentence) data '(data sentences edges)))
      sync)))
 
+(defvar powerthesaurus--json-parser #'(lambda () (json-read)))
+
+(when (and (functionp 'json-available-p)
+           (json-available-p))
+  (setq powerthesaurus--json-parser #'(lambda () (json-parse-buffer :object-type 'alist))))
+
 (defun powerthesaurus--api-query (variables query &optional callback postprocess sync)
   "TBD"
   (let ((post (or postprocess 'identity)))
@@ -496,7 +487,7 @@ its default value varies depending on value of QUERY-TYPE."
       :type "POST"
       :data (json-encode `(("variables" . ,variables)
                            ("query" . ,query)))
-      :parser #'(lambda () (funcall post (json-parse-buffer :object-type 'alist)))
+      :parser #'(lambda () (funcall post (funcall powerthesaurus--json-parser)))
       :headers powerthesaurus-request-headers
       :success (powerthesaurus--wrap-as-callback callback)
       :sync (or (null callback)
@@ -504,6 +495,7 @@ its default value varies depending on value of QUERY-TYPE."
                 powerthesaurus-synchronous-requests))))
 
 (defun powerthesaurus--wrap-as-callback (fun)
+  "TBD"
   (cl-function
    (lambda (&key data &allow-other-keys)
      ;; in order to allow users to quit powerthesaurus
@@ -520,7 +512,9 @@ its default value varies depending on value of QUERY-TYPE."
   (setq request-log-level -1)
   (setq request-message-level -1))
 
+;; ===============================================================
 ;; Define old API's now deprecated functions.
+;; ===============================================================
 
 ;;;###autoload
 (defun powerthesaurus-lookup-word-dwim ()
