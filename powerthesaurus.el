@@ -4,7 +4,7 @@
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "25.1") (request "0.3.0") (jeison "1.0.0"))
 ;; Keywords: convenience, writing
 
@@ -72,9 +72,9 @@ the user will be prompt for a valid value."
                    (list nil nil nil)))))
     (setq query-term (read-string "Term: " query-term)
           query-type (or query-type
-                         (completing-read "Query type: "
-                                          powerthesaurus-supported-query-types
-                                          nil t))
+                         (intern (completing-read "Query type: "
+                                                  powerthesaurus-supported-query-types
+                                                  nil t)))
           action-type (powerthesaurus-prefix-to-action action-type query-type))
     (cond
      ((eq action-type 'action-insert)
