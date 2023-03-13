@@ -354,10 +354,23 @@ its default value varies depending on value of QUERY-TYPE."
       (goto-char (point-min)))
     (pop-to-buffer buf)))
 
+(defun powerthesaurus--compose-completion-candidate (result)
+  "Compose completion candidate out of the given RESULT.
+
+RESULT should be an instance of `powerthesaurus-result'."
+  (let* ((text (oref result text))
+         (rating (format "%s★ " (oref result rating))) )
+    (propertize text 'line-prefix rating)))
+
+(defun powerthesaurus--compose-completion-candidates (results)
+  "Compose completion candidates out of the given RESULTS.
+
+RESULT should be a list of `powerthesaurus-result'."
+  (mapcar #'powerthesaurus--compose-completion-candidate results))
+
 (defun powerthesaurus--select-candidate (candidates)
   "Prompt the user to select one of the CANDIDATES returned from a query."
-  (print candidates)
-  (let* ((candidates-sorted (powerthesaurus--sort-candidates candidates))
+  (let* ((candidates-processed (powerthesaurus--compose-completion-candidates candidates))
          ;; this is the only way we can keep the order while using
          ;; the default implementation of completing-read function
          ;; see: https://emacs.stackexchange.com/a/41808/23751
@@ -367,16 +380,12 @@ its default value varies depending on value of QUERY-TYPE."
                 '(metadata (display-sort-function . identity)
                            (cycle-sort-function . identity))
               (complete-with-action
-               action candidates-sorted string pred))))
+               action candidates-processed string pred))))
          ;; ivy still will try to sort it lexicographically: deny it
-         (ivy-sort-functions-alist '((t . (lambda (x y) 0)))))
+         (ivy-sort-functions-alist '((t . (lambda (x y) 0))))
+         ;; ivy-rich can mess up our efforts of displaying rating
+         (ivy--display-transformers-alist nil))
     (completing-read "Choose a candidate: " completion-table nil nil)))
-
-(defun powerthesaurus--sort-candidates (synonyms)
-  "Compose choices from the `powerthesaurus-result' list of SYNONYMS."
-  (mapcar (lambda (word) (oref word text))
-          (sort synonyms (lambda (x y) (< (oref x rating)
-                                     (oref y rating))))))
 
 ;; ===============================================================
 ;; Requests and JSON parsing
@@ -530,7 +539,7 @@ SYNC is t for synchronous version of the request."
                 powerthesaurus-synchronous-requests))))
 
 (defun powerthesaurus--wrap-as-callback (fun)
-  "TBD"
+  "Wrap the given FUN function as a `request' callback."
   (cl-function
    (lambda (&key data &allow-other-keys)
      ;; in order to allow users to quit powerthesaurus
