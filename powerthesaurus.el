@@ -72,9 +72,9 @@ the user will be prompt for a valid value."
                    (list nil nil nil)))))
     (setq query-term (read-string "Term: " query-term)
           query-type (or query-type
-                         (completing-read "Query type: "
-                                          powerthesaurus-supported-query-types
-                                          nil t))
+                         (intern (completing-read "Query type: "
+                                                  powerthesaurus-supported-query-types
+                                                  nil t)))
           action-type (powerthesaurus-prefix-to-action action-type query-type))
     (cond
      ((eq action-type 'action-insert)
