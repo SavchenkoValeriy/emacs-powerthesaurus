@@ -1,4 +1,5 @@
-![emacs-powerthesaurus](assets/emacs-powerthesaurus.png)
+![emacs-powerthesaurus](assets/emacs-powerthesaurus-light.png#gh-light-mode-only)
+![emacs-powerthesaurus](assets/emacs-powerthesaurus-dark.png#gh-dark-mode-only)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![MELPA](https://melpa.org/packages/powerthesaurus-badge.svg)](https://melpa.org/#/powerthesaurus)
 
