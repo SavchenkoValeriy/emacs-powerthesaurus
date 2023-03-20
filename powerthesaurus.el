@@ -387,7 +387,8 @@ RESULT should be a list of `powerthesaurus-result'."
          (ivy-sort-functions-alist '((t . (lambda (x y) 0))))
          ;; ivy-rich can mess up our efforts of displaying rating
          (ivy--display-transformers-alist nil))
-    (completing-read "Choose a candidate: " completion-table nil nil)))
+    (substring-no-properties
+     (completing-read "Choose a candidate: " completion-table nil nil))))
 
 ;; ===============================================================
 ;; Requests and JSON parsing
