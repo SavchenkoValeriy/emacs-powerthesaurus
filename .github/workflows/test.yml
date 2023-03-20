@@ -21,7 +21,8 @@ jobs:
           - macos-12
           - ubuntu-22.04
         emacs-version:
-          - 25.3
+          # FIXME: figure out how to fix it for Emacs 25
+          # - 25.3
           - 26.3
           - 27.2
           - 28.1

@@ -4,8 +4,8 @@
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.3.1
-;; Package-Requires: ((emacs "25.1") (request "0.3.0") (jeison "1.0.0"))
+;; Version: 0.3.2
+;; Package-Requires: ((emacs "26.1") (jeison "1.0.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -31,13 +31,15 @@
 ;;; insert selected option in the buffer (depending on the current selection).
 
 ;;; Code:
-(require 'request)
+(require 'url)
+(require 'subr-x)
 (require 'jeison)
 
 (defvar powerthesaurus-request-headers
-  '(("User-Agent" . "Chrome/74.0.3729.169")
-    ("Content-Type" . "application/json"))
+  '(("Content-Type" . "application/json"))
   "List of headers included in the request sent to 'powerthesaurus.org'.")
+
+(defvar powerthesaurus-user-agent "Chrome/74.0.3729.169")
 
 (defvar powerthesaurus-synchronous-requests nil
   "If non-nil, requests send to 'powerthesaurus.org' are synchronous.")
@@ -511,12 +513,6 @@ SYNC is t for synchronous version of the request."
      (lambda (data) (jeison-read '(list-of powerthesaurus-sentence) data '(data sentences edges)))
      sync)))
 
-(defvar powerthesaurus--json-parser #'(lambda () (json-read)))
-
-(when (and (functionp 'json-available-p)
-           (json-available-p))
-  (setq powerthesaurus--json-parser #'(lambda () (json-parse-buffer :object-type 'alist))))
-
 (defun powerthesaurus--query-impl (variables query &optional callback postprocess sync)
   "Request data from Powerthesaurus GraphQL API.
 
@@ -525,18 +521,36 @@ QUERY is the actual GraphQL query.
 CALLBACK gets called whenever the response is received and processed.
 POSTPROCESS is the additional processing of the JSON response alist.
 SYNC is t for synchronous version of the request."
-  (let ((post (or postprocess 'identity)))
-    (request
-      powerthesaurus-api-url
-      :type "POST"
-      :data (json-encode `(("variables" . ,variables)
-                           ("query" . ,query)))
-      :parser #'(lambda () (funcall post (funcall powerthesaurus--json-parser)))
-      :headers powerthesaurus-request-headers
-      :success (powerthesaurus--wrap-as-callback callback)
-      :sync (or (null callback)
-                sync
-                powerthesaurus-synchronous-requests))))
+  (make-local-variable 'url-show-status)
+  (let* ((post (or postprocess 'identity))
+         (sync (or (null callback)
+                   sync
+                   powerthesaurus-synchronous-requests))
+         (url-request-data (json-encode `(("variables" . ,variables)
+                                          ("query" . ,query))))
+         (url-request-extra-headers powerthesaurus-request-headers)
+         (url-request-method "POST")
+         ;; User agent has to be set separately like this, so that
+         ;; url-retrieve won't add anything else to it.
+         (url-user-agent powerthesaurus-user-agent)
+         ;; Prohibit it from writing "Contacting host:..." every
+         ;; time we send a request, it's not informative.
+         (url-show-status nil)
+         (callback (lambda (&rest _)
+                     (with-local-quit
+                       (let* ((raw (string-trim
+                                    (buffer-substring
+                                     url-http-end-of-headers (point-max))))
+                              ;; TODO: parse JSON more efficiently
+                              ;;       if native method is available
+                              (json (json-read-from-string raw))
+                              (data (funcall post json)))
+                         (funcall callback data))))))
+    (if (not sync)
+        (url-retrieve powerthesaurus-api-url callback)
+      (with-current-buffer
+          (url-retrieve-synchronously powerthesaurus-api-url)
+        (funcall callback)))))
 
 (defun powerthesaurus--wrap-as-callback (fun)
   "Wrap the given FUN function as a `request' callback."
@@ -545,16 +559,6 @@ SYNC is t for synchronous version of the request."
      ;; in order to allow users to quit powerthesaurus
      ;; prompt with C-g, we need to wrap callback with this
      (with-local-quit (funcall fun data)))))
-
-(defun powerthesaurus-debug-connection ()
-  "Debug requests to powerthesaurus.org."
-  (setq request-log-level `debug)
-  (setq request-message-level `debug))
-
-(defun powerthesaurus-undebug-connection ()
-  "Switch off debug information for requests."
-  (setq request-log-level -1)
-  (setq request-message-level -1))
 
 ;; ===============================================================
 ;; Define old API's now deprecated functions.
