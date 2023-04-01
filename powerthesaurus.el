@@ -5,7 +5,7 @@
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
 ;; Version: 0.3.3
-;; Package-Requires: ((emacs "26.1") (jeison "1.0.0"))
+;; Package-Requires: ((emacs "26.1") (jeison "1.0.0") (s "1.13.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,6 +32,7 @@
 
 ;;; Code:
 (require 'url)
+(require 's)
 (require 'subr-x)
 (require 'jeison)
 
