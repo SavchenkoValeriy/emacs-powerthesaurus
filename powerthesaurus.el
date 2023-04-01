@@ -1,10 +1,10 @@
 ;;; powerthesaurus.el --- Powerthesaurus integration -*- lexical-binding: t; -*-
 
-;; Copyright (c) 2018 Valeriy Savchenko (GNU/GPL Licence)
+;; Copyright (c) 2018-2023 Valeriy Savchenko (GNU/GPL Licence)
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.3.3
+;; Version: 0.3.4
 ;; Package-Requires: ((emacs "26.1") (jeison "1.0.0") (s "1.13.0"))
 ;; Keywords: convenience, writing
 
