@@ -388,6 +388,10 @@ RESULT should be a list of `powerthesaurus-result'."
          (ivy-sort-functions-alist '((t . (lambda (x y) 0))))
          ;; ivy-rich can mess up our efforts of displaying rating
          (ivy--display-transformers-alist nil))
+    ;; If we try to call completing-read with an active company popup,
+    ;; we inherit its key map. That leads to some funny bugs (see issue#33).
+    (when (fboundp 'company-uninstall-map)
+      (company-uninstall-map))
     (substring-no-properties
      (completing-read "Choose a candidate: " completion-table nil nil))))
 
