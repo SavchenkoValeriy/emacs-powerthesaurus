@@ -1,11 +1,11 @@
 ;;; powerthesaurus.el --- Powerthesaurus integration -*- lexical-binding: t; -*-
 
-;; Copyright (c) 2018 Valeriy Savchenko (GNU/GPL Licence)
+;; Copyright (c) 2018-2023 Valeriy Savchenko (GNU/GPL Licence)
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.3.3
-;; Package-Requires: ((emacs "26.1") (jeison "1.0.0"))
+;; Version: 0.3.4
+;; Package-Requires: ((emacs "26.1") (jeison "1.0.0") (s "1.13.0"))
 ;; Keywords: convenience, writing
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,6 +32,7 @@
 
 ;;; Code:
 (require 'url)
+(require 's)
 (require 'subr-x)
 (require 'jeison)
 
@@ -387,6 +388,10 @@ RESULT should be a list of `powerthesaurus-result'."
          (ivy-sort-functions-alist '((t . (lambda (x y) 0))))
          ;; ivy-rich can mess up our efforts of displaying rating
          (ivy--display-transformers-alist nil))
+    ;; If we try to call completing-read with an active company popup,
+    ;; we inherit its key map. That leads to some funny bugs (see issue#33).
+    (when (fboundp 'company-uninstall-map)
+      (company-uninstall-map))
     (substring-no-properties
      (completing-read "Choose a candidate: " completion-table nil nil))))
 
@@ -670,6 +675,39 @@ In this case, a selected synonym will be inserted at the point."
     }
   }
 }")
+
+;; ===============================================================
+;; UI shortcuts
+;; ===============================================================
+
+(when (require 'hydra nil :noerror)
+  (defhydra powerthesaurus-hydra (:color blue :hint nil)
+    "
+  Power Thesaurus
+  ^Similarity^           ^Information^
+  ---------------------------------------
+  _s_: Synonyms          _d_: Definitions
+  _a_: Antonyms          _e_: Example Sentences
+  _r_: Related Words
+  _q_: Quit
+  "
+    ("s" powerthesaurus-lookup-synonyms-dwim)
+    ("a" powerthesaurus-lookup-antonyms-dwim)
+    ("r" powerthesaurus-lookup-related-dwim)
+    ("d" powerthesaurus-lookup-definitions-dwim)
+    ("e" powerthesaurus-lookup-sentences-dwim)
+    ("q" nil)))
+
+(when (require 'transient nil :noerror)
+  (transient-define-prefix powerthesaurus-transient ()
+  "Transient for Power Thesaurus."
+  [["Similarity"
+    ("s" "Synonyms" powerthesaurus-lookup-synonyms-dwim)
+    ("a" "Antonyms" powerthesaurus-lookup-antonyms-dwim)
+    ("r" "Related Words" powerthesaurus-lookup-related-dwim)]
+   ["Information"
+    ("d" "Definitions" powerthesaurus-lookup-definitions-dwim)
+    ("e" "Example Sentences" powerthesaurus-lookup-sentences-dwim)]]))
 
 (provide 'powerthesaurus)
 ;;; powerthesaurus.el ends here
