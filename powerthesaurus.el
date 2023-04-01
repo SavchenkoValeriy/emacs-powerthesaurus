@@ -672,5 +672,38 @@ In this case, a selected synonym will be inserted at the point."
   }
 }")
 
+;; ===============================================================
+;; UI shortcuts
+;; ===============================================================
+
+(when (require 'hydra nil :noerror)
+  (defhydra powerthesaurus-hydra (:color blue :hint nil)
+    "
+  Power Thesaurus
+  ^Similarity^           ^Information^
+  ---------------------------------------
+  _s_: Synonyms          _d_: Definitions
+  _a_: Antonyms          _e_: Example Sentences
+  _r_: Related Words
+  _q_: Quit
+  "
+    ("s" powerthesaurus-lookup-synonyms-dwim)
+    ("a" powerthesaurus-lookup-antonyms-dwim)
+    ("r" powerthesaurus-lookup-related-dwim)
+    ("d" powerthesaurus-lookup-definitions-dwim)
+    ("e" powerthesaurus-lookup-sentences-dwim)
+    ("q" nil)))
+
+(when (require 'transient nil :noerror)
+  (transient-define-prefix powerthesaurus-transient ()
+  "Transient for Power Thesaurus."
+  [["Similarity"
+    ("s" "Synonyms" powerthesaurus-lookup-synonyms-dwim)
+    ("a" "Antonyms" powerthesaurus-lookup-antonyms-dwim)
+    ("r" "Related Words" powerthesaurus-lookup-related-dwim)]
+   ["Information"
+    ("d" "Definitions" powerthesaurus-lookup-definitions-dwim)
+    ("e" "Example Sentences" powerthesaurus-lookup-sentences-dwim)]]))
+
 (provide 'powerthesaurus)
 ;;; powerthesaurus.el ends here
