@@ -4,7 +4,7 @@
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.3.5
+;; Version: 0.3.6
 ;; Package-Requires: ((emacs "26.1") (jeison "1.0.0") (s "1.13.0"))
 ;; Keywords: convenience, writing
 
@@ -681,10 +681,9 @@ In this case, a selected synonym will be inserted at the point."
 ;; ===============================================================
 
 ;;;###autoload
-(eval-when-compile
-  (when (require 'hydra nil :noerror)
-    (defhydra powerthesaurus-hydra (:color blue :hint nil)
-      "
+(when (require 'hydra nil :noerror)
+  (eval '(defhydra powerthesaurus-hydra (:color blue :hint nil)
+           "
   Power Thesaurus
   ^Similarity^           ^Information^
   ---------------------------------------
@@ -693,25 +692,24 @@ In this case, a selected synonym will be inserted at the point."
   _r_: Related Words
   _q_: Quit
   "
-      ("s" powerthesaurus-lookup-synonyms-dwim)
-      ("a" powerthesaurus-lookup-antonyms-dwim)
-      ("r" powerthesaurus-lookup-related-dwim)
-      ("d" powerthesaurus-lookup-definitions-dwim)
-      ("e" powerthesaurus-lookup-sentences-dwim)
-      ("q" nil))))
+           ("s" powerthesaurus-lookup-synonyms-dwim)
+           ("a" powerthesaurus-lookup-antonyms-dwim)
+           ("r" powerthesaurus-lookup-related-dwim)
+           ("d" powerthesaurus-lookup-definitions-dwim)
+           ("e" powerthesaurus-lookup-sentences-dwim)
+           ("q" nil))))
 
 ;;;###autoload
-(eval-when-compile
-  (when (require 'transient nil :noerror)
-    (transient-define-prefix powerthesaurus-transient ()
-      "Transient for Power Thesaurus."
-      [["Similarity"
-        ("s" "Synonyms" powerthesaurus-lookup-synonyms-dwim)
-        ("a" "Antonyms" powerthesaurus-lookup-antonyms-dwim)
-        ("r" "Related Words" powerthesaurus-lookup-related-dwim)]
-       ["Information"
-        ("d" "Definitions" powerthesaurus-lookup-definitions-dwim)
-        ("e" "Example Sentences" powerthesaurus-lookup-sentences-dwim)]])))
+(when (require 'transient nil :noerror)
+  (eval '(transient-define-prefix powerthesaurus-transient ()
+           "Transient for Power Thesaurus."
+           [["Similarity"
+             ("s" "Synonyms" powerthesaurus-lookup-synonyms-dwim)
+             ("a" "Antonyms" powerthesaurus-lookup-antonyms-dwim)
+             ("r" "Related Words" powerthesaurus-lookup-related-dwim)]
+            ["Information"
+             ("d" "Definitions" powerthesaurus-lookup-definitions-dwim)
+             ("e" "Example Sentences" powerthesaurus-lookup-sentences-dwim)]])))
 
 (provide 'powerthesaurus)
 ;;; powerthesaurus.el ends here
