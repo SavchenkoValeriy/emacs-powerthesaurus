@@ -31,6 +31,7 @@
 ;;; insert selected option in the buffer (depending on the current selection).
 
 ;;; Code:
+(require 'eieio)
 (require 'url)
 (require 's)
 (require 'subr-x)
@@ -44,6 +45,15 @@
 
 (defvar powerthesaurus-synchronous-requests nil
   "If non-nil, requests send to 'powerthesaurus.org' are synchronous.")
+
+(defvar powerthesaurus-show-tags t
+  "Whether to show word tags during completion.")
+
+(defvar powerthesaurus-show-part-of-speech t
+  "Whether to show word's part of speech during completion.")
+
+(defvar powerthesaurus-show-rating t
+  "Whether to show word's rating during completion.")
 
 (defconst powerthesaurus-supported-query-types
   (list :synonyms :antonyms :related :definitions :sentences))
@@ -199,9 +209,9 @@ default to cursor's current location."
 If optional arguments BEG and END are not specified,
 the contents of the current active region are used."
   (cl-flet ((substring-and-bounds
-             (lambda (beg end)
-               (list (buffer-substring-no-properties beg end)
-                     beg end))))
+              (lambda (beg end)
+                (list (buffer-substring-no-properties beg end)
+                      beg end))))
     ;; If *either* BEG or END have been specified,
     ;; then try to get the specified substring.
     ;; Notice that in case only one of them has been passed,
@@ -362,26 +372,70 @@ its default value varies depending on value of QUERY-TYPE."
 
 RESULT should be an instance of `powerthesaurus-result'."
   (let* ((text (oref result text))
-         (rating (format "%s★ " (oref result rating))) )
+         (rating (format "%s★ " (oref result rating))))
     (propertize text 'line-prefix rating)))
 
 (defun powerthesaurus--compose-completion-candidates (results)
   "Compose completion candidates out of the given RESULTS.
 
 RESULT should be a list of `powerthesaurus-result'."
-  (mapcar #'powerthesaurus--compose-completion-candidate results))
+  (if (not powerthesaurus-show-rating)
+      (mapcar (lambda (result) (oref result text)) results)
+    (let* ((ratings (mapcar
+                     (lambda (result) (number-to-string (oref result rating)))
+                     results))
+           (maxlen (reduce #'max (mapcar #'length ratings))))
+      (cl-mapcar (lambda (result rating)
+                   (let* ((len (length rating))
+                          (padding-len (1+ (- maxlen len)))
+                          (padding (make-string padding-len ? ))
+                          (rating-pretty (format "%s★%s" rating padding)))
+                     (propertize (oref result text) 'line-prefix rating-pretty)))
+                 results ratings))))
+
+(defun powerthesaurus--annotate-candidate (candidate max-candidate-length)
+  "Annotate given completion CANDIDATE.
+
+MAX-CANDIDATE-LENGTH is the maximum length among all candidates, it is required
+for proper annotation alignment."
+  (let* ((tags (string-join (oref candidate tags) ", "))
+         (padding-len (- max-candidate-length (length (oref candidate text))))
+         (padding (make-string padding-len ? ))
+         (pos (string-join (mapcar
+                            (lambda (index)
+                              (format "%s" (oref (powerthesaurus--part-of-speech-of-index index) shorter)))
+                            (oref candidate pos))
+                           ", "))
+         (annotation ""))
+    (when (and powerthesaurus-show-part-of-speech (> (length pos) 0))
+      (setq annotation pos))
+    (when (and powerthesaurus-show-tags (> (length tags) 0))
+      (setq annotation (concat annotation "\t#" tags)))
+    (if (> (length annotation) 0)
+        (concat padding "\t\t\t" annotation)
+      "")))
 
 (defun powerthesaurus--select-candidate (candidates)
   "Prompt the user to select one of the CANDIDATES returned from a query."
   (let* ((candidates-processed (powerthesaurus--compose-completion-candidates candidates))
+         (candidates-by-text (mapcar
+                              (lambda (candidate) `(,(oref candidate text) . ,candidate))
+                              candidates))
+         (maxlen (reduce #'max (mapcar
+                                (lambda (candidate) (length (oref candidate text)))
+                                candidates)))
          ;; this is the only way we can keep the order while using
          ;; the default implementation of completing-read function
          ;; see: https://emacs.stackexchange.com/a/41808/23751
          (completion-table
           (lambda (string pred action)
             (if (eq action 'metadata)
-                '(metadata (display-sort-function . identity)
-                           (cycle-sort-function . identity))
+                `(metadata (display-sort-function . identity)
+                           (cycle-sort-function . identity)
+                           (annotation-function . ,(lambda (text)
+                                                     (powerthesaurus--annotate-candidate
+                                                      (assoc-default text candidates-by-text)
+                                                      maxlen))))
               (complete-with-action
                action candidates-processed string pred))))
          ;; ivy still will try to sort it lexicographically: deny it
@@ -399,11 +453,61 @@ RESULT should be a list of `powerthesaurus-result'."
 ;; Requests and JSON parsing
 ;; ===============================================================
 
+(defclass powerthesaurus--part-of-speech nil
+  ((singular :initarg :singular :type string)
+   (plural :initarg :plural :type string)
+   (shorter :initarg :shorter :type string)))
+
+(defconst powerthesaurus-parts-of-speech
+  (vector
+   (powerthesaurus--part-of-speech :singular "adjective"
+                                   :plural "adjectives"
+                                   :shorter "adj.")
+   (powerthesaurus--part-of-speech :singular "noun"
+                                   :plural "nouns"
+                                   :shorter "n.")
+   (powerthesaurus--part-of-speech :singular "pronoun"
+                                   :plural "pronouns"
+                                   :shorter "pr.")
+   (powerthesaurus--part-of-speech :singular "adverb"
+                                   :plural "adverbs"
+                                   :shorter "adv.")
+   (powerthesaurus--part-of-speech :singular "idiom"
+                                   :plural "idioms"
+                                   :shorter "idi.")
+   (powerthesaurus--part-of-speech :singular "verb"
+                                   :plural "verbs"
+                                   :shorter "v.")
+   (powerthesaurus--part-of-speech :singular "interjection"
+                                   :plural "interjections"
+                                   :shorter "int.")
+   (powerthesaurus--part-of-speech :singular "phrase"
+                                   :plural "phrases"
+                                   :shorter "phr.")
+   (powerthesaurus--part-of-speech :singular "conjunction"
+                                   :plural "conjunctions"
+                                   :shorter "conj.")
+   (powerthesaurus--part-of-speech :singular "preposition"
+                                   :plural "prepositions"
+                                   :shorter "prep.")
+   (powerthesaurus--part-of-speech :singular "phrasal verb"
+                                   :plural "phrasal verbs"
+                                   :shorter "phr. v."))
+  "All parts of speech supported by powerthesaurus.")
+
+(defun powerthesaurus--part-of-speech-of-index (index)
+  "Return the POS info for the given API INDEX."
+  (elt powerthesaurus-parts-of-speech (1- index)))
+
 (jeison-defclass powerthesaurus-result nil
   ((text :initarg :text :type string :path (node targetTerm name)
          :documentation "Actual text of the word from Powerthesaurus")
    (rating :initarg :rating :type number :path (node rating)
-           :documentation "User rating of the word")))
+           :documentation "User rating of the word")
+   (tags :initarg :tags :type (list-of string) :path (node relations tags)
+         :documentation "Tags of the word")
+   (pos :initarg :pos :type (list-of number) :path (node relations parts_of_speech)
+        :documentation "Parts of speech indicies (1-based) of the word")))
 
 (jeison-defclass powerthesaurus-definition nil
   ((text :initarg :text :type string :path (node definition)
@@ -456,7 +560,7 @@ SYNC is t for synchronous version of the request."
   `(let ((on-success
           (lambda (,name)
             ,@body)))
-     (powerthesaurus--request-term-id ,term on-success sync)))
+     (powerthesaurus--request-term-id ,term on-success ,sync)))
 
 (defun powerthesaurus--query-thesaurus (term type &optional callback sync)
   "Request thesaurus information from Powerthesaurus.
@@ -624,7 +728,10 @@ In this case, a selected synonym will be inserted at the point."
 (make-obsolete 'powerthesaurus-lookup-word-dwim
                'powerthesaurus-lookup "0.2.0")
 
+;; ===============================================================
 ;; GraphQL queries
+;; ===============================================================
+
 (defconst powerthesaurus--search-query
   "query SEARCH($query: String!) {
   search(query: $query) {
@@ -643,6 +750,7 @@ In this case, a selected synonym will be inserted at the point."
         targetTerm {
           name
         }
+        relations
         rating
         votes
       }
