@@ -60,6 +60,31 @@
 
 (defconst powerthesaurus-api-url "https://api.powerthesaurus.org")
 
+(defface powerthesaurus-definition-part-of-speech
+  '((t :inherit font-lock-keyword-face))
+  "Face of the definition's part of speech."
+  :group 'powerthesaurus)
+
+(defface powerthesaurus-definition-definition
+  '((t :weight bold))
+  "Face of the actual definition part of the definition."
+  :group 'powerthesaurus)
+
+(defface powerthesaurus-definition-usages
+  '((t :inherit font-lock-comment-face))
+  "Face of the usage example for the definition."
+  :group 'powerthesaurus)
+
+(defface powerthesaurus-definition-synonyms
+  '((t :inherit font-lock-type-face))
+  "Face of the definition's synonyms."
+  :group 'powerthesaurus)
+
+(defface powerthesaurus-definition-author
+  '((t :inherit default))
+  "Face of the definition's author."
+  :group 'powerthesaurus)
+
 ;;;###autoload
 (defun powerthesaurus-lookup-dwim (&optional action-type query-type)
   "Wrapper function for general lookup commands.
@@ -336,6 +361,47 @@ insert text under cursor."
   (when pnt (goto-char pnt))
   (insert (powerthesaurus--preprocess-text text reference)))
 
+(defun powerthesaurus--insert-definition-as-text (definition)
+  "Insert given lookup DEFINITION as text into the current buffer."
+  (let ((pos (string-join (mapcar
+                           (lambda (index)
+                             (propertize
+                              (oref (powerthesaurus--part-of-speech-of-index index) singular)
+                              'face 'powerthesaurus-definition-part-of-speech))
+                           (oref definition pos))
+                          ", "))
+        (usages (string-join (mapcar (lambda (usage)
+                                       (propertize
+                                        (format "%S" usage)
+                                        'face 'powerthesaurus-definition-usages))
+                                     (oref definition usages))
+                             "\n"))
+        (definition (propertize (oref definition text)
+                                'face 'powerthesaurus-definition-definition))
+        (author (propertize (oref definition author)
+                            'face 'powerthesaurus-definition-author))
+        (synonyms (string-join (mapcar (lambda (synonym)
+                                         (propertize
+                                          synonym
+                                          'face 'powerthesaurus-definition-synonyms))
+                                       (oref definition synonyms))
+                               ", ")))
+    (when (> (length pos) 0)
+      (insert pos "\n\n"))
+    (insert definition "\n\n")
+    (when (> (length usages) 0)
+      (insert usages "\n\n"))
+    (when (> (length synonyms) 0)
+      (insert "synonyms: " synonyms "\n\n"))
+    (insert author)))
+
+(defun powerthesaurus--insert-as-text (result)
+  "Insert given lookup RESULT as text into the current buffer."
+  (cond
+   ((powerthesaurus-definition-p result)
+    (powerthesaurus--insert-definition-as-text result))
+   (t (insert (oref result text)))))
+
 (defun powerthesaurus--display-results (results query-term query-type
                                                 &optional sep)
   "Display results on a dedicated buffer.
@@ -350,7 +416,7 @@ its default value varies depending on value of QUERY-TYPE."
   (unless sep
     (cond
      ((member query-type '(:definitions :sentences))
-      (setq sep "\n----------------\n"))
+      (setq sep "\n────────────────\n"))
      (t (setq sep "\n"))))
   (let* ((buf-name (format "*Powerthesaurus - \"%s\" - %s*"
                            query-term query-type))
@@ -362,7 +428,11 @@ its default value varies depending on value of QUERY-TYPE."
         (read-only-mode -1)
         (erase-buffer))
       (dolist (elt results)
-        (insert (oref elt text) sep))
+        (powerthesaurus--insert-as-text elt)
+        (insert "\n"
+                sep
+                (propertize "\014" 'display "")
+                "\n"))
       (help-mode)
       (goto-char (point-min)))
     (pop-to-buffer buf)))
@@ -403,7 +473,7 @@ for proper annotation alignment."
          (padding (make-string padding-len ? ))
          (pos (string-join (mapcar
                             (lambda (index)
-                              (format "%s" (oref (powerthesaurus--part-of-speech-of-index index) shorter)))
+                              (oref (powerthesaurus--part-of-speech-of-index index) shorter))
                             (oref candidate pos))
                            ", "))
          (annotation ""))
@@ -509,11 +579,24 @@ for proper annotation alignment."
    (pos :initarg :pos :type (list-of number) :path (node relations parts_of_speech)
         :documentation "Parts of speech indicies (1-based) of the word")))
 
+(defun powerthesaurus--get-synonym-names (json-array)
+  "For the given synonym JSON-ARRAY, return its name as string."
+  (mapcar (lambda (json) (jeison-read 'string json '(name))) json-array))
+
 (jeison-defclass powerthesaurus-definition nil
   ((text :initarg :text :type string :path (node definition)
          :documentation "Definition from Powerthesaurus")
    (rating :initarg :rating :type number :path (node rating)
-           :documentation "User rating of the definition")))
+           :documentation "User rating of the definition")
+   (synonyms :initarg :synonyms :type (list-of string)
+             :path (node (powerthesaurus--get-synonym-names synonyms))
+             :documentation "List of synonyms for the definition")
+   (usages :initarg :usages :type (list-of string) :path (node usages)
+           :documentation "List of usages for the definition")
+   (author :initarg :author :type string :path (node author title)
+           :documentation "Original author of the definition")
+   (pos :initarg :pos :type (list-of number) :path (node partsOfSpeech)
+        :documentation "Parts of speech indicies (1-based) of the definition")))
 
 (jeison-defclass powerthesaurus-sentence nil
   ((text :initarg :text :type string :path (node sentence)
@@ -766,7 +849,13 @@ In this case, a selected synonym will be inserted at the point."
         definition
         rating
         votes
-      }
+        synonyms
+        usages
+        partsOfSpeech
+        author {
+          title
+        }
+       }
     }
   }
 }")
