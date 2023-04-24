@@ -85,6 +85,16 @@
   "Face of the definition's author."
   :group 'powerthesaurus)
 
+(defface powerthesaurus-sentence-sentence
+  '((t :weight bold))
+  "Face of the example sentence."
+  :group 'powerthesaurus)
+
+(defface powerthesaurus-sentence-author
+  '((t :inherit default))
+  "Face of the example sentence author."
+  :group 'powerthesaurus)
+
 ;;;###autoload
 (defun powerthesaurus-lookup-dwim (&optional action-type query-type)
   "Wrapper function for general lookup commands.
@@ -395,11 +405,23 @@ insert text under cursor."
       (insert "synonyms: " synonyms "\n\n"))
     (insert author)))
 
+(defun powerthesaurus--insert-sentence-as-text (sentence)
+  "Insert given lookup SENTENCE as text into the current buffer."
+  (let ((text (propertize (oref sentence text)
+                          'face 'powerthesaurus-sentence-sentence))
+        (author (propertize (oref sentence author)
+                            'face 'powerthesaurus-sentence-author)))
+    (insert text)
+    (when (and (> (length author) 0) (not (string= author "unknown")))
+      (insert "\n\n" author))))
+
 (defun powerthesaurus--insert-as-text (result)
   "Insert given lookup RESULT as text into the current buffer."
   (cond
    ((powerthesaurus-definition-p result)
     (powerthesaurus--insert-definition-as-text result))
+   ((powerthesaurus-sentence-p result)
+    (powerthesaurus--insert-sentence-as-text result))
    (t (insert (oref result text)))))
 
 (defun powerthesaurus--display-results (results query-term query-type
@@ -602,7 +624,9 @@ for proper annotation alignment."
   ((text :initarg :text :type string :path (node sentence)
          :documentation "Sentence example from Powerthesaurus")
    (rating :initarg :rating :type number :path (node rating)
-           :documentation "User rating of the sentence")))
+           :documentation "User rating of the sentence")
+   (author :initarg :author :type string :path (node author title)
+           :documentation "Original author of the sentence")))
 
 (defun powerthesaurus--query (term type &optional callback sync)
   "Make a query to Powerthesaurus.
@@ -868,6 +892,9 @@ In this case, a selected synonym will be inserted at the point."
         sentence
         rating
         votes
+        author {
+          title
+        }
       }
     }
   }
