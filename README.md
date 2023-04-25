@@ -50,6 +50,13 @@ The previous API (prior to version 0.2) is still available but not recommended. 
 
 ## Changelog
 
+### Version 0.4.0
+* Include additional information with definition and example sentences.
+* Annotate suggestions with part of speech and tags.
+* Add `transient` and `hydra` interfaces.
+* Speed up consecutive requests (it's ~4x times faster with `url-retrieve`).
+* Add rating visualization
+
 ### Version 0.3.0
 * Migrate from parsing HTML of the page to the use of the API.
 
