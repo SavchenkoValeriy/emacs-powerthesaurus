@@ -4,7 +4,7 @@
 
 ;; Authors: Valeriy Savchenko <sinmipt@gmail.com>
 ;; URL: http://github.com/SavchenkoValeriy/emacs-powerthesaurus
-;; Version: 0.4.0
+;; Version: 0.4.1
 ;; Package-Requires: ((emacs "26.1") (jeison "1.0.0") (s "1.13.0"))
 ;; Keywords: convenience, writing
 
@@ -32,6 +32,7 @@
 
 ;;; Code:
 (require 'eieio)
+(require 'cl-seq)
 (require 'url)
 (require 's)
 (require 'subr-x)
@@ -476,7 +477,7 @@ RESULT should be a list of `powerthesaurus-result'."
     (let* ((ratings (mapcar
                      (lambda (result) (number-to-string (oref result rating)))
                      results))
-           (maxlen (reduce #'max (mapcar #'length ratings))))
+           (maxlen (cl-reduce #'max (mapcar #'length ratings))))
       (cl-mapcar (lambda (result rating)
                    (let* ((len (length rating))
                           (padding-len (1+ (- maxlen len)))
@@ -513,9 +514,9 @@ for proper annotation alignment."
          (candidates-by-text (mapcar
                               (lambda (candidate) `(,(oref candidate text) . ,candidate))
                               candidates))
-         (maxlen (reduce #'max (mapcar
-                                (lambda (candidate) (length (oref candidate text)))
-                                candidates)))
+         (maxlen (cl-reduce #'max (mapcar
+                                   (lambda (candidate) (length (oref candidate text)))
+                                   candidates)))
          ;; this is the only way we can keep the order while using
          ;; the default implementation of completing-read function
          ;; see: https://emacs.stackexchange.com/a/41808/23751
