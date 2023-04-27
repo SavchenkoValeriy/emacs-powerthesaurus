@@ -31,13 +31,32 @@
 ;;; Code:
 
 (require 'powerthesaurus)
-(require 'hydra)
+
+
+;;; Transient
 
 ;;;###autoload
-(autoload #'powerthesaurus-hydra/body "powerthesaurus-hydra" nil t)
+(autoload #'powerthesaurus-transient "powerthesaurus-ui-shortcuts" nil t)
 
-(defhydra powerthesaurus-hydra (:color blue :hint nil)
-  "
+(when (require 'transient nil :noerror)
+  (transient-define-prefix powerthesaurus-transient ()
+    "Transient for Power Thesaurus."
+    [["Similarity"
+      ("s" "Synonyms" powerthesaurus-lookup-synonyms-dwim)
+      ("a" "Antonyms" powerthesaurus-lookup-antonyms-dwim)
+      ("r" "Related Words" powerthesaurus-lookup-related-dwim)]
+     ["Information"
+      ("d" "Definitions" powerthesaurus-lookup-definitions-dwim)
+      ("e" "Example Sentences" powerthesaurus-lookup-sentences-dwim)]]))
+
+;;; Hydra
+
+;;;###autoload
+(autoload #'powerthesaurus-hydra/body "powerthesaurus-ui-shortcuts" nil t)
+
+(when (require 'hydra nil :noerror)
+  (defhydra powerthesaurus-hydra (:color blue :hint nil)
+    "
   Power Thesaurus
   ^Similarity^           ^Information^
   ---------------------------------------
@@ -46,14 +65,21 @@
   _r_: Related Words
   _q_: Quit
   "
-  ("s" powerthesaurus-lookup-synonyms-dwim)
-  ("a" powerthesaurus-lookup-antonyms-dwim)
-  ("r" powerthesaurus-lookup-related-dwim)
-  ("d" powerthesaurus-lookup-definitions-dwim)
-  ("e" powerthesaurus-lookup-sentences-dwim)
-  ("q" nil))
+    ("s" powerthesaurus-lookup-synonyms-dwim)
+    ("a" powerthesaurus-lookup-antonyms-dwim)
+    ("r" powerthesaurus-lookup-related-dwim)
+    ("d" powerthesaurus-lookup-definitions-dwim)
+    ("e" powerthesaurus-lookup-sentences-dwim)
+    ("q" nil)))
 
+;;; powerthesaurus-ui-shortcuts.el ends here
 
-(provide 'powerthesaurus-hydra)
+(provide 'powerthesaurus-ui-shortcuts)
 
-;;; powerthesaurus-hydra.el ends here
+;; Disable compilation, because transient and hydra are optional arguments, the
+;; compiler may warn against unsatisfied requirements. Also speed isn't so
+;; crucial here and lazy loading is already achieved.
+
+;; Local Variables:
+;; no-byte-compile: t
+;; End:
